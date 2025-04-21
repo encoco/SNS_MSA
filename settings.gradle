@@ -1,0 +1,10 @@
+rootProject.name = 'SNS_MSA'
+
+include 'eureka-server'
+include 'gateway-service'
+include 'chat-service'
+include 'user-service'
+include 'board-service'
+include 'alarm-service'
+
+include 'common'
