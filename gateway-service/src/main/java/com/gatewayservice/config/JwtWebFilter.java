@@ -19,7 +19,7 @@ public class JwtWebFilter implements WebFilter {
 
     private static final String[] WHITELIST = {
             "/api/users/Login", "/api/users/join", "/api/auth/refresh",
-            "/api/users/Logout", "/api/chats/ws"
+            "/api/users/Logout", "/api/chats/ws" , "/actuator/**"
     };
 
     @Override
@@ -32,6 +32,7 @@ public class JwtWebFilter implements WebFilter {
         String path = exchange.getRequest().getPath().value();
         for (String white : WHITELIST) {
             if (path.startsWith(white)) {
+                System.out.println("화이트 리스트 uri : " + exchange.getRequest().getURI());
                 return chain.filter(exchange);
             }
         }
