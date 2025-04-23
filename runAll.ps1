@@ -1,5 +1,5 @@
 #powershell -ExecutionPolicy Bypass -File .\runAll.ps1
-
+#docker compose up -d    docker 실행
 $services = @(
     @{ Name = "🔥 Eureka";     Command = "./gradlew :eureka-server:bootRun" },
     @{ Name = "🚀 User";       Command = "./gradlew :user-service:bootRun" },

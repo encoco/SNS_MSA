@@ -43,8 +43,7 @@ public class FollowController {
     public ResponseEntity<Map<String, Integer>> getFollowCount(@PathVariable int userId) {
         int followerCount = followService.countFollowers(userId);
         int followingCount = followService.countFollowing(userId);
-        System.out.println("Follower count: " + followerCount);
-        System.out.println("Following count: " + followingCount);
+
         Map<String, Integer> result = new HashMap<>();
         result.put("followerCount", followerCount);
         result.put("followingCount", followingCount);
