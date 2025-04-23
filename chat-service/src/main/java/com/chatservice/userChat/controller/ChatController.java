@@ -51,6 +51,7 @@ public class ChatController implements ChatDocs {
         List<ChatDTO> dto = chatService.selectRoom(userId);
 
         long end = System.currentTimeMillis();
+        //System.out.println("최적화 이전 수행 시간(ms): " + (end - start));
         System.out.println("최적화 방식 수행 시간(ms): " + (end - start));
         try {
             if (dto != null) {

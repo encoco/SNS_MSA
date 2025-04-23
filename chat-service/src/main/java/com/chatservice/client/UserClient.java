@@ -23,6 +23,9 @@ public interface UserClient {
     @PostMapping("/api/users/profile-images")
     Map<Integer, String> getProfileImages(@RequestBody List<Integer> userIds);
 
+    @GetMapping("/api/users/info/{userId}")
+    ResponseEntity<UsersInfoDTO> getUserInfo(@PathVariable int userId);
+
     @GetMapping("/api/users/user-info")
     ResponseEntity<List<UsersInfoDTO>> getUserInfoList(@RequestParam("userIds") List<Long> userIds);
 }

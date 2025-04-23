@@ -29,7 +29,6 @@ class WebSocketService {
         };
 
         this.client.onConnect = (frame) => {
-            console.log("WebSocket 연결 완료");
             callback?.();
         };
 

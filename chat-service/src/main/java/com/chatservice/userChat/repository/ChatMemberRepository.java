@@ -3,6 +3,7 @@ package com.chatservice.userChat.repository;
 import com.chatservice.userChat.entity.ChatMemberEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface ChatMemberRepository extends JpaRepository<ChatMemberEntity, Integer> {
@@ -10,5 +11,7 @@ public interface ChatMemberRepository extends JpaRepository<ChatMemberEntity, In
     List<ChatMemberEntity> findByUserId(int userId);
 
     void deleteByChatRoom_IdAndUserId(int userChatId, int id);
+
+    List<ChatMemberEntity> findByChatRoom_IdIn(List<Integer> chatRoomIds);
 }
 

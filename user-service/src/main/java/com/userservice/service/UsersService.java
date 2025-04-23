@@ -55,7 +55,6 @@ public class UsersService {
             UsersEntity entity = usersRepository.findByNickname(profile.getOriginal());
             entity.setNickname(profile.getNickname());
             entity.setState_message(profile.getState_message());
-            System.out.println(entity);
 //            if (profile.getImgpath() != null) {
 //                entity.setProfile_img(bservice.uploadFile(profile.getImgpath(), "userProfile"));
 //            }

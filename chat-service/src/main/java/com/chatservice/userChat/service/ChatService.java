@@ -29,34 +29,48 @@ public class ChatService {
      * 내가 참여한 채팅방 목록 조회
      */
     public List<ChatDTO> selectRoom(int userId) {
-        List<ChatMemberEntity> participants = chatMemberRepository.findByUserId(userId);
-        List<ChatRoomEntity> chatRooms = participants.stream()
+        // 1. 참여중인 채팅방 목록 조회
+        List<ChatMemberEntity> myMemberships = chatMemberRepository.findByUserId(userId);
+        List<ChatRoomEntity> chatRooms = myMemberships.stream()
                 .map(ChatMemberEntity::getChatRoom)
                 .distinct()
                 .toList();
 
-        Set<Integer> allPartnerIds = chatRooms.stream()
-                .flatMap(chatRoom -> chatMemberRepository.findByChatRoom_Id(chatRoom.getId()).stream()
+        // 2. 한 번에 모든 채팅방의 참여자 조회
+        List<Integer> chatRoomIds = chatRooms.stream()
+                .map(ChatRoomEntity::getId)
+                .toList();
+
+        Map<Integer, List<ChatMemberEntity>> chatRoomMemberMap = chatMemberRepository.findByChatRoom_IdIn(chatRoomIds).stream()
+                .collect(Collectors.groupingBy(m -> m.getChatRoom().getId()));
+
+        // 3. 본인 제외한 모든 상대 유저 ID 수집
+        Set<Integer> allPartnerIds = chatRoomMemberMap.values().stream()
+                .flatMap(members -> members.stream()
                         .map(ChatMemberEntity::getUserId)
                         .filter(id -> id != userId))
                 .collect(Collectors.toSet());
 
+        // 4. 유저 정보 요청
         List<Long> userIdList = allPartnerIds.stream()
-                .map(Integer::longValue)  // Integer → Long 변환
+                .map(Integer::longValue)
                 .toList();
 
         List<UsersInfoDTO> userInfos = userClient.getUserInfoList(userIdList).getBody();
         Map<Integer, UsersInfoDTO> userInfoMap = userInfos.stream()
                 .collect(Collectors.toMap(UsersInfoDTO::getId, dto -> dto));
 
+        // 5. 채팅방 정보 + 상대방 ID로 DTO 생성
         List<ChatDTO> result = chatRooms.stream()
                 .map(chatRoom -> {
-                    List<Integer> otherUserIds = chatMemberRepository.findByChatRoom_Id(chatRoom.getId()).stream()
+                    List<ChatMemberEntity> members = chatRoomMemberMap.getOrDefault(chatRoom.getId(), List.of());
+
+                    int partnerId = members.stream()
                             .map(ChatMemberEntity::getUserId)
                             .filter(id -> id != userId)
-                            .toList();
+                            .findFirst()
+                            .orElse(userId);  // 상대가 없을 경우 fallback
 
-                    int partnerId = otherUserIds.isEmpty() ? userId : otherUserIds.get(0);
                     UsersInfoDTO info = userInfoMap.get(partnerId);
                     return ChatDTO.toDTO(chatRoom, userId,
                             info != null ? info.getNickname() : "Unknown",

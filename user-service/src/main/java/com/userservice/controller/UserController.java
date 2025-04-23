@@ -148,9 +148,7 @@ public class UserController {
 
     @GetMapping("/user-info")
     public ResponseEntity<List<com.common.dto.UsersInfoDTO>> getUserInfoList(@RequestParam List<Long> userIds) {
-        System.out.println("넘어온 IDS : " + userIds);
         List<com.common.dto.UsersInfoDTO> userInfoList = usersService.getUserInfoList(userIds);
-        System.out.println("정보 : " + userInfoList);
         return ResponseEntity.ok(userInfoList);
     }
 
