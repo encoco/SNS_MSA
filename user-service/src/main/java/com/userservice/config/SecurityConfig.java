@@ -45,6 +45,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/nickname/**", "/api/users/profile/**",
                                          "/api/users/nicknames/**", "/api/users/profile-images/**",
                                          "/api/users/follow/**","/api/users/info/**","/api/users/user-info/**").permitAll()
+                        .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers(
                                 "/api/users/Login", "/api/users/Signup", "/api/users/Logout",
                                 "/index.html", "/api/users/checkId"

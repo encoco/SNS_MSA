@@ -1,5 +1,4 @@
 #powershell -ExecutionPolicy Bypass -File ./stop.ps1
-
 Write-Host "모든 서비스 종료 중..." -ForegroundColor Red
 
 # 종료할 프로세스 이름 목록
