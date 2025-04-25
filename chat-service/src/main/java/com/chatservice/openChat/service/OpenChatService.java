@@ -29,6 +29,7 @@ public class OpenChatService {
     private final OpenChatMemberRepository openMemberRepository;
     private final OpenChatMessageRepository openMessageRepository;
     private final UserClient userClient;
+    private final OpenChatMemberRepository openChatMemberRepository;
     //private final BoardService boardService;
 
     public void CreateCommChat(OpenChatDTO dto) {
@@ -37,9 +38,20 @@ public class OpenChatService {
         openChatRepository.save(entity);
     }
 
-    public List<OpenChatDTO> selectAllCommuRoom() {
-        List<OpenChatEntity> entity = openChatRepository.findAll();
-        return OpenChatDTO.toDTOList(entity);
+    public List<OpenChatDTO> selectAllOpenRoom() {
+        List<OpenChatEntity> entityList = openChatRepository.findAll();
+        List<OpenChatDTO> dtoList = new ArrayList<>();
+
+        for (OpenChatEntity entity : entityList) {
+            OpenChatDTO dto = OpenChatDTO.toDTO(entity);
+
+            int count = openChatMemberRepository.countByOpenChatId(entity.getOpenChatId());
+            dto.setParticipantCount(count);
+
+            dtoList.add(dto);
+        }
+
+        return dtoList;
     }
 
     public void joinCommunity(OpenChatDTO dto) {

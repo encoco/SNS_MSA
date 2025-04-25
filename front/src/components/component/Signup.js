@@ -57,8 +57,8 @@ function Signup() {
 
     const checkIdDuplicate = async () => {
         try {
-            const response = await axios.post('http://localhost:8000/api/users/checkId', {
-                //const response = await axios.post('http://13.125.161.122:8080/api/checkId', {
+            //const response = await axios.post('http://localhost:8000/api/users/checkId', {
+            const response = await axios.post('/api/users/checkId', {
                 username: username,
                 nickname: Nick
             });

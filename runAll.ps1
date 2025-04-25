@@ -1,5 +1,5 @@
 #powershell -ExecutionPolicy Bypass -File .\runAll.ps1
-#docker compose up -d    docker 실행
+
 $services = @(
     @{ Name = "🔥 Eureka";     Command = "./gradlew :eureka-server:bootRun" },
     @{ Name = "🚀 User";       Command = "./gradlew :user-service:bootRun" },
@@ -23,4 +23,4 @@ foreach ($svc in $services) {
 }
 
 $processIds | Out-File -Encoding ASCII ".\services.pid"
-Write-Host "`n✅ 모든 서비스 실행 완료. 종료하려면 'stop.ps1' 실행"
+Write-Host "`n 모든 서비스 실행 완료. 종료하려면 'stop.ps1' 실행"

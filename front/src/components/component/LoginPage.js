@@ -30,7 +30,8 @@ function LoginPage() {
             const params = new URLSearchParams();
             params.append('username', username);
             params.append('password', password);
-            const response = await axios.post('http://localhost:8000/api/users/Login', params, {
+            //const response = await axios.post('http://localhost:8000/api/users/Login', params, {
+            const response = await axios.post('/api/users/Login', params, {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded'
                 },
