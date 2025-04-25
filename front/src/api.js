@@ -13,7 +13,10 @@ function addRefreshSubscriber(callback) {
 }
 
 const api = axios.create({
-    baseURL: 'http://localhost:8000/api',
+    //baseURL: 'http://localhost:8000/api', Default
+
+    //Docker 설정
+    baseURL: '/api',
     withCredentials: true,
     // headers: {
     //     "Content-Type": "application/json"

@@ -9,4 +9,5 @@ public interface OpenChatMemberRepository extends JpaRepository<OpenChatMemberEn
     List<OpenChatMemberEntity> findAllById(int userId);
     void deleteByOpenChatIdAndId(int openChatId, int id);
 
+    int countByOpenChatId(int openChatId);
 }

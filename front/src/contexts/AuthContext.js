@@ -24,7 +24,8 @@ export const AuthProvider = ({children}) => {
 
     const logout = async () => {
         try {
-            const response  = await axios.get('http://localhost:8000/api/users/Logout', {
+            //const response  = await axios.get('http://localhost:8000/api/users/Logout', {
+            const response  = await axios.get('/api/users/Logout', {
                 withCredentials: true
             });
             // 여기서 응답 처리

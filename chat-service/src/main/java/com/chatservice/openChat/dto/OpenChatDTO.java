@@ -36,6 +36,8 @@ public class OpenChatDTO {
     @Schema(description = "업로드할 이미지 파일")
     private MultipartFile img;
 
+    @Schema(description = "참여자 수", example = "5")
+    private int participantCount;
 
     @Builder.Default
     private String date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"));

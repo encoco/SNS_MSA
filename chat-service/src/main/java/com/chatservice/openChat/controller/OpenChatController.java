@@ -43,8 +43,22 @@ public class OpenChatController implements OpenDocs {
 
     @GetMapping("/open")
     public ResponseEntity<?> openRoom() {
-        List<OpenChatDTO> dto = openChatService.selectAllCommuRoom();
+        List<OpenChatDTO> dto = openChatService.selectAllOpenRoom();
 
+        try {
+            if (dto != null) {
+                return ResponseEntity.ok(dto);
+            }
+            return ResponseEntity.ok("채팅방 없음");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("selectRoom error");
+        }
+    }
+
+    @GetMapping("/open/my")
+    public ResponseEntity<?> selectOpenMyRoom() {
+        List<OpenChatMemberDTO> dto = openChatService.selectOpenChat(AuthInfoUtil.getUserId());
+        System.out.println(dto);
         try {
             if (dto != null) {
                 return ResponseEntity.ok(dto);
@@ -82,19 +96,6 @@ public class OpenChatController implements OpenDocs {
         return ResponseEntity.ok(null);
     }
 
-    @GetMapping("/open/my")
-    public ResponseEntity<?> selectOpenMyRoom() {
-        List<OpenChatMemberDTO> dto = openChatService.selectOpenChat(AuthInfoUtil.getUserId());
-        System.out.println(dto);
-        try {
-            if (dto != null) {
-                return ResponseEntity.ok(dto);
-            }
-            return ResponseEntity.ok("채팅방 없음");
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("selectRoom error");
-        }
-    }
 
     @PostMapping("/open/{openChatId}/leave")
         public ResponseEntity<Void> leaveOpenChat(@RequestBody OpenChatMemberDTO dto) {
