@@ -90,6 +90,5 @@ Spring Cloud 기반 기술 스택을 활용해 유연하고 확장 가능한 구
 - [ ] 서비스별 테스트 코드 작성 및 GitHub Actions 자동 테스트
 - [ ] Elastic Stack 기반 로그 수집/분석 구조 적용
 - [ ] 슬랙/이메일 기반 실시간 알림 Webhook 연동
-- [ ] 쿠버네티스 Helm Chart를 통한 배포 실험
 
 ---

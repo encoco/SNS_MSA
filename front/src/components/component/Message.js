@@ -7,10 +7,10 @@ import {Avatar, AvatarFallback, AvatarImage} from "./ui/avatar";
 import React, {useEffect, useRef, useState} from 'react';
 import api from "../../api";
 import Search from './ui/search';
-import { webSocketService } from '../../services/WebSocketService';
+import {webSocketService} from '../../services/WebSocketService';
 import {BrowserView, MobileView} from 'react-device-detect';
 import DetailModal from './ui/DetailModal';
-import { MdExitToApp } from 'react-icons/md';
+import {MdExitToApp} from 'react-icons/md';
 
 function Message() {
     const [showTopBtn, setShowTopBtn] = useState(false);
@@ -30,14 +30,16 @@ function Message() {
     const location = useLocation();
     const [componentroom, setComponentRoom] = useState(location.state?.room || {});
     const [contextMenu, setContextMenu] = useState(null);
+    const [userInfoMap, setUserInfoMap] = useState(new Map());
+    const [showParticipants, setShowParticipants] = useState(false);
+    const [selectedRoomForParticipants, setSelectedRoomForParticipants] = useState(null);
 
-    // 우클릭 핸들러: 채팅방 항목에서 우클릭 시 컨텍스트 메뉴 위치와 대상 room 설정
-    const handleContextMenu = (e, room) => {
-        e.preventDefault();
+    const handleContextMenu = (event, room) => {
+        event.preventDefault();
         setContextMenu({
-            x: e.pageX,
-            y: e.pageY,
-            room,
+            x: event.pageX,
+            y: event.pageY,
+            room: room
         });
     };
 
@@ -78,28 +80,33 @@ function Message() {
         }
     }, []);
 
+    const handleShowParticipants = (room) => {
+        setSelectedRoomForParticipants(room);
+        setShowParticipants(true);
+    };
 
     useEffect(() => {
-        const fetchChatrooms = async () => {
+        const fetchData = async () => {
             try {
-                const response = await api.get(`/chats/rooms/my`, {
-                    withCredentials: true,
-                });
-                console.log("채팅방 내역 : " , response.data);
-                setChatRoom(response.data === "채팅방 없음" ? [] : response.data);
+                const response = await api.get('/chats/rooms/my',
+                                                            {withCredentials: true});
+                const {chatRooms, userInfoList} = response.data;
+
+                const map = new Map(userInfoList.map(user => [user.id, user]));
+
+                setChatRoom(chatRooms);
+                setUserInfoMap(map);
             } catch (error) {
-                console.log(error);
+                console.error('채팅방 불러오기 실패', error);
             }
         };
-        fetchChatrooms();
+
+        fetchData();
     }, []);
 
     useEffect(() => {
         if (!webSocketService.client.connected || !selectedChat) return;
-        const chatPath =
-            activeView === 'chat'
-                ? `/api/chats/sub/chat/${selectedChat}`
-                : `/api/chats/sub/open/${selectedChat}`;
+        const chatPath = activeView === 'chat' ? `/api/chats/sub/chat/${selectedChat}` : `/api/chats/sub/open/${selectedChat}`;
 
         const subscription = webSocketService.subscribe(chatPath, (message) => {
             setMessages(prev => [...prev, message]);
@@ -129,8 +136,7 @@ function Message() {
     // 맨 위로 스크롤하는 함수
     const scrollToTop = () => {
         window.scrollTo({
-            top: 0,
-            behavior: 'smooth' // 부드러운 스크롤
+            top: 0, behavior: 'smooth' // 부드러운 스크롤
         });
     };
 
@@ -141,19 +147,14 @@ function Message() {
         if (inputMessage.trim()) {
             if (activeView === 'group') {
                 const message = {
-                    content: inputMessage,
-                    nickname: nickname,
-                    room_number: nickname
+                    content: inputMessage, nickname: nickname, room_number: nickname
                 };
-                console.log("message : " , message);
+                console.log("message : ", message);
                 console.log(selectedChat);
-                webSocketService.send(`/api/chats/pub/open/${selectedChat}`, message, localStorage.getItem("userInfo")
-                );
+                webSocketService.send(`/api/chats/pub/open/${selectedChat}`, message, localStorage.getItem("userInfo"));
             } else if (activeView === 'chat') {
                 const message = {
-                    content: inputMessage,
-                    nickname: nickname,
-                    chat_id: selectedChat
+                    content: inputMessage, nickname: nickname, chat_id: selectedChat
                 };
                 webSocketService.send(`/api/chats/pub/chat/${selectedChat}`, message);
 
@@ -213,8 +214,7 @@ function Message() {
             setMessages([]);// 채팅방 변경 시 메시지 초기화
             console.log("현재 WebSocket 연결 상태:", webSocketService.client.connected);
             const response = await api.get(`/chats/UserMessage`, {
-                params: {userChatId: room.userChatId},
-                withCredentials: true,
+                params: {userChatId: room.userChatId}, withCredentials: true,
             });
             setMessages(response.data);
         } catch (error) {
@@ -279,15 +279,12 @@ function Message() {
                 // 오픈채팅 나가기 요청
                 await api.post(`/chats/open/${room.openChatId}/leave`, {
                     openChatId: room.openChatId
-                }, { withCredentials: true });
+                }, {withCredentials: true});
             } else {
                 // 일반채팅 나가기 요청
-                const response = await api.post(
-                    "/chats/room/leave",
-                    {userChatId: room.userChatId}, // 필요한 데이터 형식에 맞게 수정
-                    {withCredentials: true}
-                );
-             }
+                const response = await api.post("/chats/room/leave", {userChatId: room.userChatId}, // 필요한 데이터 형식에 맞게 수정
+                    {withCredentials: true});
+            }
             // // 채팅방 목록에서 나간 채팅방 제거 (옵션)
             setChatRoom(prevRooms => prevRooms.filter(item => item !== room));
             setSelectedChat('');
@@ -296,207 +293,189 @@ function Message() {
         }
     };
 
-    return (
-        <div className="app">
-            <BrowserView>
-                <div className="grid min-h-screen w-full grid-cols-[280px_1fr]">
-                    <div className=" border-r ">
-                        <Sidebar/>
-                    </div>
-                    <div className="flex flex-col">
-                        <header
-                            className="flex h-14 lg:h-[60px] items-center gap-4 border-b bg-gray-100/40 px-6 dark:bg-gray-800/40">
-                            <div className="w-full flex-1">
-                                <Input
-                                    className="w-full bg-white shadow-none appearance-none pl-8 md:w-2/3 lg:w-1/3 dark:bg-gray-950"
-                                    placeholder="채팅 검색하기"
-                                    type="search"
-                                />
-                            </div>
+    return (<div className="app">
+        <BrowserView>
+            <div className="grid min-h-screen w-full grid-cols-[280px_1fr]">
+                <div className=" border-r ">
+                    <Sidebar/>
+                </div>
+                <div className="flex flex-col">
+                    <header
+                        className="flex h-14 lg:h-[60px] items-center gap-4 border-b bg-gray-100/40 px-6 dark:bg-gray-800/40">
+                        <div className="w-full flex-1">
+                            <Input
+                                className="w-full bg-white shadow-none appearance-none pl-8 md:w-2/3 lg:w-1/3 dark:bg-gray-950"
+                                placeholder="채팅 검색하기"
+                                type="search"
+                            />
+                        </div>
 
-                            <div className="flex h-[60px] items-center border-b px-6">
-                                <Link className="flex items-center gap-2 font-semibold" href="#">
-                                    <MessageCircleIcon className="h-6 w-6"/>
-                                    <span className="">채팅방</span>
-                                </Link>
-                            </div>
-                        </header>
-                        <main className="flex-1 flex flex-col">
-                            <div className="flex-1 flex">
-                                {activeView === 'chat' ? (			/*여기는 일반채팅*/
-                                    // 채팅 화면 컨텐츠
-                                    <div className="flex-1 flex flex-col">
-                                        <div className="flex-1 overflow-y-auto py-2 max-h-[calc(100vh-135px)] p-6">
-                                            <div className="grid gap-4">
-                                                {/* 채팅 메시지 출력 영역 */}
-                                                {/* 채팅 예제 */}
-                                                {selectedChat && messages && messages.length > 0 ? (
-                                                    messages.map((message, index) => (
-                                                        <div key={`${message.message_id}_${index}`}
-                                                             className={`flex items-start gap-4 ${message.id === id ? 'flex-row-reverse' : 'flex-row'}`}>
-                                                            <Avatar>
-                                                                <AvatarImage alt={message.nickname}
-                                                                             src={message.profile_img || "/placeholder-user.jpg"}
-                                                                             className={`rounded-full ${message.id === id ? 'order-1' : ''}`}
-                                                                             style={{
-                                                                                 width: '50px',
-                                                                                 height: '50px',
-                                                                                 objectFit: 'cover'
-                                                                             }}
-                                                                />
-                                                                <AvatarFallback>{message.id ? message.id[0] : '?'}</AvatarFallback>
-                                                            </Avatar>
-                                                            <div className="max-w-[40%]">
-                                                                <p className={`flex items-start gap-4 ${message.id === id ? 'flex-row-reverse' : 'flex-row'}`}>
-                                                                    <Link to={`/UserPage/${message.id}`}>
-                                                                        {message.nickname}
-                                                                    </Link>
-                                                                </p>
-                                                                <div
-                                                                    className={`rounded-lg p-4 text-sm ${message.id === id ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-800'}`}>
-                                                                    {message.content ? (
-                                                                        <p>{message.content}</p>
-                                                                    ) : (
-                                                                        <button onClick={() => openModal(message)}
-                                                                                className="bg-white text-black border border-black hover:bg-green-500 hover:text-white px-4
+                        <div className="flex h-[60px] items-center border-b px-6">
+                            <Link className="flex items-center gap-2 font-semibold" href="#">
+                                <MessageCircleIcon className="h-6 w-6"/>
+                                <span className="">채팅방</span>
+                            </Link>
+                        </div>
+                    </header>
+                    <main className="flex-1 flex flex-col">
+                        <div className="flex-1 flex">
+                            {activeView === 'chat' ? (			/*여기는 일반채팅*/
+                                // 채팅 화면 컨텐츠
+                                <div className="flex-1 flex flex-col">
+                                    <div className="flex-1 overflow-y-auto py-2 max-h-[calc(100vh-135px)] p-6">
+                                        <div className="grid gap-4">
+                                            {/* 채팅 메시지 출력 영역 */}
+                                            {/* 채팅 예제 */}
+                                            {selectedChat && messages && messages.length > 0 ? (messages.map((message, index) => (
+                                                <div key={`${message.message_id}_${index}`}
+                                                     className={`flex items-start gap-4 ${message.id === id ? 'flex-row-reverse' : 'flex-row'}`}>
+
+                                                    <Avatar>
+                                                        <AvatarImage alt={message.nickname}
+                                                                     src={message.profile_img || "/placeholder-user.jpg"}
+                                                                     className={`rounded-full ${message.id === id ? 'order-1' : ''}`}
+                                                                     style={{
+                                                                         width: '50px',
+                                                                         height: '50px',
+                                                                         objectFit: 'cover'
+                                                                     }}
+                                                        />
+                                                        <AvatarFallback>{message.id ? message.id[0] : '?'}</AvatarFallback>
+                                                    </Avatar>
+
+                                                    <div className="max-w-[40%]">
+                                                        <p className={`flex items-start gap-4 ${message.id === id ? 'flex-row-reverse' : 'flex-row'}`}>
+                                                            <Link to={`/UserPage/${message.id}`}>
+                                                                {message.nickname}
+                                                            </Link>
+                                                        </p>
+                                                        <div
+                                                            className={`rounded-lg p-4 text-sm ${message.id === id ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                                                            {message.content ? (<p>{message.content}</p>) : (
+                                                                <button onClick={() => openModal(message)}
+                                                                        className="bg-white text-black border border-black hover:bg-green-500 hover:text-white px-4
 														                  													py-2 rounded transition duration-150 ease-in-out">
-                                                                            {message.nickname}님이 공유한 글이에요!
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                                <div
-                                                                    className="text-xs text-gray-500 dark:text-gray-400">{message.date}</div>
-                                                            </div>
-                                                            <div ref={messageEndRef}/>
+                                                                    {message.nickname}님이 공유한 글이에요!
+                                                                </button>)}
                                                         </div>
-                                                    ))
-                                                ) : (
-                                                    <div className="flex justify-center items-center h-full">
-                                                        <p className="text-gray-500">채팅을 시작하세요</p>
+                                                        <div
+                                                            className="text-xs text-gray-500 dark:text-gray-400">{message.date}</div>
                                                     </div>
-                                                )}
+                                                    <div ref={messageEndRef}/>
+                                                </div>))) : (
+                                                <div className="flex justify-center items-center h-full">
+                                                    <p className="text-gray-500">채팅을 시작하세요</p>
+                                                </div>)}
 
-                                            </div>
-                                        </div>
-                                        <div className="border-t px-6 py-4">
-                                            <form className="flex items-center gap-2" onSubmit={handleSendMessage}>
-                                                <Input className="flex-1" placeholder="메세지를 입력하세요..." type="text"
-                                                       value={inputMessage}
-                                                       onChange={e => setInputMessage(e.target.value)}/>
-                                                <Button size="icon" type="submit" variant="ghost">
-                                                    <SendIcon className="h-5 w-5"/>
-                                                </Button>
-                                            </form>
                                         </div>
                                     </div>
-                                ) : (			/*여기부터 오픈채팅*/
-                                    selectedChat ? (
-                                        <div className="flex-1 flex flex-col">
-                                            {/* 채팅 메시지 출력 영역 */}
-                                            <div className="flex-1 overflow-y-auto py-2 max-h-[calc(100vh-135px)] p-6">
-                                                <div className="grid gap-4">
-                                                    {messages && messages.length > 0 ? (
-                                                        messages.map((message, index) => (
-                                                            <div key={`${message.commessage_id}_${index}`}
-                                                                 className={`flex items-start gap-4 ${message.id === id ? 'justify-end' : ''}`}>
-                                                                <Avatar>
-                                                                    <AvatarImage alt={message.id}
-                                                                                 src={message.profile_img || "/placeholder-user.jpg"}
-                                                                                 style={{
-                                                                                     width: '50px',
-                                                                                     height: '50px',
-                                                                                     objectFit: 'cover'
-                                                                                 }}/>
-                                                                    <AvatarFallback>{message.communitychat_id}</AvatarFallback>
-                                                                </Avatar>
-                                                                <div className="max-w-[40%]">
-                                                                    <p className={`flex items-start gap-4 ${message.id === id ? 'flex-row-reverse' : 'flex-row'}`}>
-                                                                        <Link to={`/UserPage/${message.id}`}>
-                                                                            {message.nickname}
-                                                                        </Link>
-                                                                    </p>
-                                                                    <div
-                                                                        className={`rounded-lg p-4 text-sm ${message.id === id ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-800'}`}>
-                                                                        <p>{message.content}</p>
-                                                                    </div>
-                                                                    <div
-                                                                        className="text-xs text-gray-500 dark:text-gray-400">{message.date}</div>
-                                                                </div>
-                                                                <div ref={messageEndRef}/>
-                                                            </div>
-                                                        ))
-                                                    ) : (
-                                                        <div className="flex justify-center items-center h-full">
-                                                            <p className="text-gray-500">채팅을 시작하세요</p>
+                                    <div className="border-t px-6 py-4">
+                                        <form className="flex items-center gap-2" onSubmit={handleSendMessage}>
+                                            <Input className="flex-1" placeholder="메세지를 입력하세요..." type="text"
+                                                   value={inputMessage}
+                                                   onChange={e => setInputMessage(e.target.value)}/>
+                                            <Button size="icon" type="submit" variant="ghost">
+                                                <SendIcon className="h-5 w-5"/>
+                                            </Button>
+                                        </form>
+                                    </div>
+                                </div>) : (			/*여기부터 오픈채팅*/
+                                selectedChat ? (<div className="flex-1 flex flex-col">
+                                    {/* 채팅 메시지 출력 영역 */}
+                                    <div className="flex-1 overflow-y-auto py-2 max-h-[calc(100vh-135px)] p-6">
+                                        <div className="grid gap-4">
+                                            {messages && messages.length > 0 ? (messages.map((message, index) => (
+                                                <div key={`${message.commessage_id}_${index}`}
+                                                     className={`flex items-start gap-4 ${message.id === id ? 'justify-end' : ''}`}>
+                                                    <Avatar>
+                                                        <AvatarImage alt={message.id}
+                                                                     src={message.profile_img || "/placeholder-user.jpg"}
+                                                                     style={{
+                                                                         width: '50px',
+                                                                         height: '50px',
+                                                                         objectFit: 'cover'
+                                                                     }}/>
+                                                        <AvatarFallback>{message.communitychat_id}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="max-w-[40%]">
+                                                        <p className={`flex items-start gap-4 ${message.id === id ? 'flex-row-reverse' : 'flex-row'}`}>
+                                                            <Link to={`/UserPage/${message.id}`}>
+                                                                {message.nickname}
+                                                            </Link>
+                                                        </p>
+                                                        <div
+                                                            className={`rounded-lg p-4 text-sm ${message.id === id ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                                                            <p>{message.content}</p>
                                                         </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            {/* 메시지 입력란 */}
-                                            <div className="border-t px-6 py-4">
-                                                <form className="flex items-center gap-2" onSubmit={handleSendMessage}>
-                                                    <Input className="flex-1" placeholder="메세지를 입력하세요..." type="text"
-                                                           value={inputMessage}
-                                                           onChange={e => setInputMessage(e.target.value)}/>
-                                                    <Button size="icon" type="submit" variant="ghost">
-                                                        <SendIcon className="h-5 w-5"/>
-                                                    </Button>
-                                                </form>
-                                            </div>
+                                                        <div
+                                                            className="text-xs text-gray-500 dark:text-gray-400">{message.date}</div>
+                                                    </div>
+                                                    <div ref={messageEndRef}/>
+                                                </div>))) : (
+                                                <div className="flex justify-center items-center h-full">
+                                                    <p className="text-gray-500">채팅을 시작하세요</p>
+                                                </div>)}
                                         </div>
-                                    ) : (
-                                        // 'Together' 컴포넌트 렌더링
-                                        <div className="flex-1 overflow-auto p-6">
-                                            <div className="grid h-full gap-4">
-                                                <Together onJoinRoom={handleGroupSelect}/>
-                                            </div>
+                                    </div>
+                                    {/* 메시지 입력란 */}
+                                    <div className="border-t px-6 py-4">
+                                        <form className="flex items-center gap-2" onSubmit={handleSendMessage}>
+                                            <Input className="flex-1" placeholder="메세지를 입력하세요..." type="text"
+                                                   value={inputMessage}
+                                                   onChange={e => setInputMessage(e.target.value)}/>
+                                            <Button size="icon" type="submit" variant="ghost">
+                                                <SendIcon className="h-5 w-5"/>
+                                            </Button>
+                                        </form>
+                                    </div>
+                                </div>) : (// 'Together' 컴포넌트 렌더링
+                                    <div className="flex-1 overflow-auto p-6">
+                                        <div className="grid h-full gap-4">
+                                            <Together onJoinRoom={handleGroupSelect}/>
                                         </div>
-                                    ))}
+                                    </div>))}
 
 
-                                <div className="w-[300px] border-l bg-gray-100/40 p-6 dark:bg-gray-800/40">
-                                    <div
-                                        className="flex-1 overflow-y-auto py-2 max-h-[calc(100vh-135px)] p-6"> {/*//여기*/}
-                                        <nav className="grid items-start px-4 text-sm font-medium">
-                                            <Link
-                                                className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${activeView === 'chat'
-                                                    ? 'bg-gray-200 text-gray-900 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-50 dark:hover:text-gray-50'
-                                                    : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50'
-                                                }`}
-                                                href="#"
-                                                onClick={() => handleChat()}
-                                            >
-                                                <MessageCircleIcon className="h-4 w-4"/>
-                                                개인채팅방
-                                            </Link>
-                                            <Link
-                                                className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${activeView === 'group'
-                                                    ? 'bg-gray-200 text-gray-900 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-50 dark:hover:text-gray-50'
-                                                    : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50'
-                                                }`}
-                                                href="#"
-                                                onClick={() => handleGroup()}
-                                            >
-                                                <GroupIcon className="h-4 w-4"/>
-                                                함께해요
-                                            </Link>
-                                            <hr className="mt-6 mb-2 border-gray-300 dark:border-gray-700"/>
-                                            <div className="flex justify-center items-center h-full">
-                                                <button onClick={() => {
-                                                    setShowModal(true);
-                                                }}
-                                                        className="px-4 py-2 mt-2 rounded bg-black text-white">
-                                                    채팅 추가
-                                                </button>
-                                            </div>
-                                            <hr className="mt-4 mb-2 border-gray-300 dark:border-gray-700"/>
+                            <div className="w-[300px] border-l bg-gray-100/40 p-6 dark:bg-gray-800/40">
+                                <div
+                                    className="flex-1 overflow-y-auto py-2 max-h-[calc(100vh-135px)] p-6"> {/*//여기*/}
+                                    <nav className="grid items-start px-4 text-sm font-medium">
+                                        <Link
+                                            className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${activeView === 'chat' ? 'bg-gray-200 text-gray-900 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-50 dark:hover:text-gray-50' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50'}`}
+                                            href="#"
+                                            onClick={() => handleChat()}
+                                        >
+                                            <MessageCircleIcon className="h-4 w-4"/>
+                                            개인채팅방
+                                        </Link>
+                                        <Link
+                                            className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${activeView === 'group' ? 'bg-gray-200 text-gray-900 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-50 dark:hover:text-gray-50' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50'}`}
+                                            href="#"
+                                            onClick={() => handleGroup()}
+                                        >
+                                            <GroupIcon className="h-4 w-4"/>
+                                            함께해요
+                                        </Link>
+                                        <hr className="mt-6 mb-2 border-gray-300 dark:border-gray-700"/>
+                                        <div className="flex justify-center items-center h-full">
+                                            <button onClick={() => {
+                                                setShowModal(true);
+                                            }}
+                                                    className="px-4 py-2 mt-2 rounded bg-black text-white">
+                                                채팅 추가
+                                            </button>
+                                        </div>
+                                        <hr className="mt-4 mb-2 border-gray-300 dark:border-gray-700"/>
 
-                                            {chatroom && chatroom.length > 0 ? (
-                                                chatroom.map((room, index) => (
+                                        {chatroom && chatroom.length > 0 ? (
+                                            chatroom.map((room, index) => {
+                                                const isSelected = selectedChat === (activeView === 'group' ? room.openChatId : room.userChatId);
+
+                                                return (
                                                     <div
                                                         key={`${activeView === 'group' ? room.openChatId : room.userChatId}_${index}`}
                                                         onContextMenu={(e) => handleContextMenu(e, room)}
-                                                        className="flex justify-between items-center h-full"
+                                                        className="flex justify-between items-center h-full m-2"
                                                     >
                                                         <button
                                                             onClick={() => {
@@ -506,346 +485,365 @@ function Message() {
                                                                     handleChatSelect(room);
                                                                 }
                                                             }}
-
-                                                            className={`flex items-center space-x-3 p-2 rounded-lg transition-colors w-full text-left ${
-                                                                selectedChat === (activeView === 'group' ? room.openChatId : room.userChatId)
-                                                                    ? 'bg-gray-200'
-                                                                    : 'hover:bg-gray-100 dark:hover:bg-gray-800'
-                                                            }`}
+                                                            className={`flex flex-col items-start space-y-1 p-2 rounded-lg transition-colors w-full text-left 
+                                shadow-md hover:shadow-md
+                                ${isSelected ? 'bg-gray-200' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
                                                         >
-                                                            <div
-                                                                className="w-12 h-12 rounded-full overflow-hidden shrink-0">
-                                                                <img
-                                                                    src={room.imgpath || room.profile_img || "/placeholder.svg"}
-                                                                    alt={room.name}
-                                                                    className="w-full h-full object-cover"
-                                                                />
+                                                            <div className="flex items-center space-x-3">
+                        <span className="text-sm font-medium text-gray-800 dark:text-white">
+                            {truncateString(activeView === 'group' ? room.title : room.roomname, 10)}
+                        </span>
                                                             </div>
-                                                            <span
-                                                                className="text-sm font-medium text-gray-800 dark:text-white">
-          {truncateString(activeView === 'group' ? room.title : room.roomname, 10)}
-        </span>
-                                                        </button>
 
+                                                            {/* 닉네임 미리보기 3명까지 */}
+                                                            <div className="flex flex-wrap gap-1 ml-14 mt-1 ">
+                                                                {room.memberIds?.slice(0, 3).map(userId => {
+                                                                    const user = userInfoMap.get(userId);
+                                                                    return (
+                                                                        <span
+                                                                            key={userId}
+                                                                            className="text-xs text-gray-500 bg-gray-200 rounded-full px-2 py-0.5"
+                                                                        >
+                                                                            {user?.nickname || "Unknown"}
+                                                                        </span>
+                                                                    );
+                                                                })}
+                                                                {room.memberIds?.length > 3 && (
+                                                                    <span className="text-xs text-gray-400 ml-1">
+                                                                        +{room.memberIds.length - 3}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </button>
                                                     </div>
-                                                ))
-                                            ) : (
-                                                <div className="flex justify-center items-center h-full">
+                                                );
+                                            })
+                                        ) : (
+                                            <div className="flex justify-center items-center h-full">
                                                 <p className="text-gray-500">채팅방이 없습니다</p>
-                                                </div>
-                                            )}
-                                        </nav>
-                                    </div>
+                                            </div>
+                                        )}
+                                    </nav>
                                 </div>
                             </div>
-
-
-                        </main>
-                    </div>
-                    <DetailModal isOpen={isModalOpen} onClose={() => setModalOpen(false)} boardId={share_id}/>
-                    {showTopBtn && (
-                        <button
-                            className="fixed bottom-10 right-10 bg-white hover:bg-gray-100 text-gray-900 font-bold rounded-full h-12 w-12 flex justify-center items-center border-4 border-gray-900 cursor-pointer"
-                            onClick={scrollToTop}
-                            style={{
-                                width: '50px',
-                                height: '50px',
-                                display: 'flex',
-                                justifyContent: 'center',
-                                alignItems: 'center'
-                            }}
-                        >
-                            ▲
-                        </button>
-                    )}
-                    <Search isOpen={showModal} onClose={() => setShowModal(false)} onRoomCreated={handleNewRoomCreated}
-                            roomList={chatroom} RoomSelectChange={handleChange}/>
-                    {/* 컨텍스트 메뉴 (우클릭 시 표시) */}
-                    {contextMenu && (
-                        <div
-                            className="absolute z-50 bg-white border rounded shadow p-2"
-                            style={{ top: contextMenu.y, left: contextMenu.x }}
-                            onMouseLeave={closeContextMenu}
-                        >
-                            <button
-                                onClick={() => {
-                                    handleLeaveRoom(contextMenu.room, activeView, setChatRoom);
-                                    closeContextMenu();
-                                }}
-                                className="flex items-center gap-1"
-                            >
-                                <MdExitToApp className="w-5 h-5" />
-                                <span>나가기</span>
-                            </button>
                         </div>
-                    )}
+
+
+                    </main>
                 </div>
-            </BrowserView>
 
-
-            {/* /////////////////////// 모바일 뷰 ////////////////////////////*/}
-            {/* /////////////////////// 모바일 뷰 ////////////////////////////*/}
-            {/* /////////////////////// 모바일 뷰 ////////////////////////////*/}
-            {/* /////////////////////// 모바일 뷰 ////////////////////////////*/}
-            {/* /////////////////////// 모바일 뷰 ////////////////////////////*/}
-
-            <MobileView>
-                <div className="flex flex-col h-screen">
-                    <div className="flex h-[60px] items-center border-b px-6">
-                        <Link className="flex items-center gap-2 font-semibold" href="#">
-                            <MessageCircleIcon className="h-6 w-6"/>
-                            <span className="">채팅방</span>
-                        </Link>
-                        <div className="ml-auto flex space-x-4">
-                            <Link
-                                className={`flex items-center gap-3 rounded-lg px-2 py-1 transition-all ${activeView === 'chat'
-                                    ? 'bg-gray-200 text-gray-900 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-50 dark:hover:text-gray-50'
-                                    : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50'}`}
-                                href="#" onClick={() => handleChat()}>
-                                <MessageCircleIcon className="h-3 w-3"/>
-                                개인
-                            </Link>
-                            <Link
-                                className={`flex items-center gap-3 rounded-lg px-2 py-1 transition-all ${activeView === 'group'
-                                    ? 'bg-gray-200 text-gray-900 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-50 dark:hover:text-gray-50'
-                                    : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50'}`}
-                                href="#" onClick={() => handleGroup()}>
-                                <GroupIcon className="h-3 w-3"/>
-                                함께해요
-                            </Link>
-                            <div className="flex justify-left items-left h-full">
-                                <button onClick={() => {
-                                    setShowModal(true);
-                                }} className="px-2 py-1 mt-2 rounded bg-black text-white">
-                                    +
+                {showParticipants && selectedRoomForParticipants && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+                        <div className="bg-white p-6 rounded-lg max-w-md w-full">
+                            <h2 className="text-lg font-bold mb-4">참여자 목록</h2>
+                            <div className="flex flex-wrap gap-2">
+                                {selectedRoomForParticipants.memberIds.map(userId => {
+                                    const user = userInfoMap.get(userId);
+                                    return (
+                                        <div key={userId} className="flex items-center gap-2 text-sm">
+                                            <img
+                                                src={user?.profile_img || "/placeholder-user.jpg"}
+                                                alt="프로필"
+                                                className="w-8 h-8 rounded-full object-cover"
+                                            />
+                                            <span>{user?.nickname || "Unknown"}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <div className="mt-4 flex justify-end">
+                                <button
+                                    onClick={() => setShowParticipants(false)}
+                                    className="text-white bg-gray-700 hover:bg-gray-800 px-4 py-2 rounded"
+                                >
+                                    닫기
                                 </button>
                             </div>
-                            <hr className="mt-6 mb-2 border-gray-300 dark:border-gray-700"/>
                         </div>
                     </div>
+                )}
+
+                <DetailModal isOpen={isModalOpen} onClose={() => setModalOpen(false)} boardId={share_id}/>
+                {showTopBtn && (<button
+                    className="fixed bottom-10 right-10 bg-white hover:bg-gray-100 text-gray-900 font-bold rounded-full h-12 w-12 flex justify-center items-center border-4 border-gray-900 cursor-pointer"
+                    onClick={scrollToTop}
+                    style={{
+                        width: '50px',
+                        height: '50px',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                    }}
+                >
+                    ▲
+                </button>)}
+                <Search isOpen={showModal} onClose={() => setShowModal(false)} onRoomCreated={handleNewRoomCreated}
+                        roomList={chatroom} RoomSelectChange={handleChange}/>
+
+                {/* 컨텍스트 메뉴 (우클릭 시 표시) */}
+                {contextMenu && (
+                    <div
+                        className="absolute z-50 bg-white border rounded shadow p-2"
+                        style={{top: contextMenu.y, left: contextMenu.x}}
+                        onMouseLeave={closeContextMenu}
+                    >
+                        <button
+                            onClick={() => {
+                                handleShowParticipants(contextMenu.room);
+                                closeContextMenu();
+                            }}
+                        >
+                            <span>참여자 목록</span>
+                        </button>
+
+                        <div className="border-t my-2"></div>
+
+                        <button
+                            onClick={() => {
+                                handleLeaveRoom(contextMenu.room, activeView, setChatRoom);
+                                closeContextMenu();
+                            }}
+                            className="flex items-center gap-1 w-full px-2 py-1 hover:bg-gray-100 text-sm"
+                        >
+                            <MdExitToApp className="w-5 h-5"/>
+                            <span>나가기</span>
+                        </button>
+                    </div>
+                )}
+            </div>
+
+        </BrowserView>
 
 
-                    <div className="flex-1 overflow-auto">
-                        {activeView === 'chat' && (
-                            <div>
-                                <div className="p-4 border-b bg-gray-100" onClick={handleToggleList}>
-                                    {selectedChat && chatroom ? room.title : "채팅을 시작해주세요"}
-                                </div>
-                                {isListExpanded && (
-                                    <div
-                                        className={`overflow-y-auto ${isListExpanded ? 'max-h-60' : 'max-h-0'} transition-max-height duration-300 ease-in-out`}>
-                                        {chatroom && chatroom.map((room, index) => (
-                                            <div key={`${room.chat_id}_${index}`}
-                                                 className="flex justify-center items-center h-full">
-                                                <button
-                                                    onClick={() => {
-                                                        if (activeView === 'group') {
-                                                            handleCommChat(room);
-                                                        } else {
-                                                            handleChatSelect(room);
-                                                        }
-                                                    }}
-                                                    className={`flex items-center space-x-3 p-2 rounded-lg transition-colors w-full text-left 
+        {/* /////////////////////// 모바일 뷰 ////////////////////////////*/}
+        {/* /////////////////////// 모바일 뷰 ////////////////////////////*/}
+        {/* /////////////////////// 모바일 뷰 ////////////////////////////*/}
+        {/* /////////////////////// 모바일 뷰 ////////////////////////////*/}
+        {/* /////////////////////// 모바일 뷰 ////////////////////////////*/}
+
+        <MobileView>
+            <div className="flex flex-col h-screen">
+                <div className="flex h-[60px] items-center border-b px-6">
+                    <Link className="flex items-center gap-2 font-semibold" href="#">
+                        <MessageCircleIcon className="h-6 w-6"/>
+                        <span className="">채팅방</span>
+                    </Link>
+                    <div className="ml-auto flex space-x-4">
+                        <Link
+                            className={`flex items-center gap-3 rounded-lg px-2 py-1 transition-all ${activeView === 'chat' ? 'bg-gray-200 text-gray-900 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-50 dark:hover:text-gray-50' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50'}`}
+                            href="#" onClick={() => handleChat()}>
+                            <MessageCircleIcon className="h-3 w-3"/>
+                            개인
+                        </Link>
+                        <Link
+                            className={`flex items-center gap-3 rounded-lg px-2 py-1 transition-all ${activeView === 'group' ? 'bg-gray-200 text-gray-900 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-50 dark:hover:text-gray-50' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50'}`}
+                            href="#" onClick={() => handleGroup()}>
+                            <GroupIcon className="h-3 w-3"/>
+                            함께해요
+                        </Link>
+                        <div className="flex justify-left items-left h-full">
+                            <button onClick={() => {
+                                setShowModal(true);
+                            }} className="px-2 py-1 mt-2 rounded bg-black text-white">
+                                +
+                            </button>
+                        </div>
+                        <hr className="mt-6 mb-2 border-gray-300 dark:border-gray-700"/>
+                    </div>
+                </div>
+
+
+                <div className="flex-1 overflow-auto">
+                    {activeView === 'chat' && (<div>
+                        <div className="p-4 border-b bg-gray-100" onClick={handleToggleList}>
+                            {selectedChat && chatroom ? room.title : "채팅을 시작해주세요"}
+                        </div>
+                        {isListExpanded && (<div
+                            className={`overflow-y-auto ${isListExpanded ? 'max-h-60' : 'max-h-0'} transition-max-height duration-300 ease-in-out`}>
+                            {chatroom && chatroom.map((room, index) => (
+                                <div key={`${room.chat_id}_${index}`}
+                                     className="flex justify-center items-center h-full">
+                                    <button
+                                        onClick={() => {
+                                            if (activeView === 'group') {
+                                                handleCommChat(room);
+                                            } else {
+                                                handleChatSelect(room);
+                                            }
+                                        }}
+                                        className={`flex items-center space-x-3 p-2 rounded-lg transition-colors w-full text-left 
                 ${selectedChat === room.chat_id ? 'bg-gray-200' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-                                                >
-                                                    <div className="w-12 h-12 rounded-full overflow-hidden shrink-0">
-                                                        <img
-                                                            src={room.imgpath || room.img || "/placeholder.svg"}
-                                                            alt={room.name}
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    </div>
-                                                    <span className="text-sm font-medium text-gray-800 dark:text-white">
+                                    >
+                                        <div className="w-12 h-12 rounded-full overflow-hidden shrink-0">
+                                            <img
+                                                src={room.imgpath || room.img || "/placeholder.svg"}
+                                                alt={room.name}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                        <span className="text-sm font-medium text-gray-800 dark:text-white">
                 {truncateString(room.title, 10)}
             </span>
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                                    </button>
+                                </div>))}
+                        </div>)}
+                    </div>)}
 
-                        {activeView === 'group' && (
-                            <div>
-                                <div className="p-4 border-b bg-gray-100" onClick={handleToggleList}>
-                                    {selectedChat && chatroom ? room.roomname : "채팅을 시작해주세요"}
-                                </div>
-                                {!selectedChat && (
-                                    <div className="flex-1 overflow-auto p-6 z-0">
-                                        <div className="grid h-full gap-4 z-0">
-                                            <Together onJoinRoom={handleGroupSelect}/>
-                                        </div>
-                                    </div>
-                                )}
-                                {isListExpanded && (
-                                    <div>
-                                        {chatroom && chatroom.map((room, index) => (
-                                            <div key={`${room.chat_id}_${index}`}
-                                                 className="flex justify-center items-center h-full">
-                                                <button
-                                                    onClick={() => {
-                                                        handleChatSelect(room);
-                                                        setIsListExpanded(false);
-                                                    }}
-                                                    className={`flex items-center space-x-3 p-2 rounded-lg transition-colors w-full text-left 
+                    {activeView === 'group' && (<div>
+                        <div className="p-4 border-b bg-gray-100" onClick={handleToggleList}>
+                            {selectedChat && chatroom ? room.roomname : "채팅을 시작해주세요"}
+                        </div>
+                        {!selectedChat && (<div className="flex-1 overflow-auto p-6 z-0">
+                            <div className="grid h-full gap-4 z-0">
+                                <Together onJoinRoom={handleGroupSelect}/>
+                            </div>
+                        </div>)}
+                        {isListExpanded && (<div>
+                            {chatroom && chatroom.map((room, index) => (
+                                <div key={`${room.chat_id}_${index}`}
+                                     className="flex justify-center items-center h-full">
+                                    <button
+                                        onClick={() => {
+                                            handleChatSelect(room);
+                                            setIsListExpanded(false);
+                                        }}
+                                        className={`flex items-center space-x-3 p-2 rounded-lg transition-colors w-full text-left 
                 ${selectedChat === room.chat_id ? 'bg-gray-200' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-                                                >
-                                                    <div className="w-12 h-12 rounded-full overflow-hidden shrink-0">
-                                                        <img
-                                                            src={room.imgpath || room.profile_img || "/placeholder.svg"}
-                                                            alt={room.name}
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    </div>
-                                                    <span className="text-sm font-medium text-gray-800 dark:text-white">
+                                    >
+                                        <div className="w-12 h-12 rounded-full overflow-hidden shrink-0">
+                                            <img
+                                                src={room.imgpath || room.profile_img || "/placeholder.svg"}
+                                                alt={room.name}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                        <span className="text-sm font-medium text-gray-800 dark:text-white">
                 {truncateString(room.roomname, 10)}
             </span>
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                    <div className="grid gap-4 bottom-5">
-                        {selectedChat && messages && messages.length > 0 ? (
-                            messages.map((message, index) => (
-                                <div
-                                    key={`${message.message_id}_${index}`} className={`flex items-start gap-4 
-				    				${message.id === id ? 'flex-row-reverse' : 'flex-row'} ${index === messages.length - 1 ? 'mb-20' : ''}`}>
-                                    <Avatar>
-                                        <AvatarImage alt={message.nickname}
-                                                     src={message.profile_img || "/placeholder-user.jpg"}
-                                                     className={`rounded-full ${message.id === id ? 'order-1' : ''}`}
-                                                     style={{
-                                                         width: '50px',
-                                                         height: '50px',
-                                                         objectFit: 'cover'
-                                                     }}
-                                        />
-                                        <AvatarFallback>{message.id ? message.id[0] : '?'}</AvatarFallback>
-                                    </Avatar>
-                                    <div className="max-w-[40%]">
-                                        <p className={`flex items-start gap-4 ${message.id === id ? 'flex-row-reverse' : 'flex-row'}`}>
-                                            <Link to={`/UserPage/${message.id}`}>
-                                                {message.nickname}
-                                            </Link>
-                                        </p>
-                                        <div
-                                            className={`rounded-lg p-4 text-sm ${message.id === id ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-800'}`}>
-                                            {message.content ? (
-                                                <p>{message.content}</p>
-                                            ) : (
-                                                <button onClick={() => openModal(message)}
-                                                        className="bg-white text-black border border-black hover:bg-green-500 hover:text-white px-4
-								                  													py-2 rounded transition duration-150 ease-in-out">
-                                                    {message.nickname}님이 공유한 글이에요!
-                                                </button>
-                                            )}
-                                        </div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400 ">{message.date}</div>
-                                    </div>
-                                    <div ref={messageEndRef}/>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="flex justify-center items-center h-full">
-                                <p className="text-gray-500">채팅을 시작하세요</p>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="fixed bottom-0 left-0 w-full bg-gray-200 py-2 px-4 flex items-center">
-                        <form className="flex items-center w-full" onSubmit={(e) => {
-                            e.preventDefault();
-                            handleSendMessage();
-                        }}>
-                            <Input className="flex-1" placeholder="메세지를 입력하세요..." type="text" value={inputMessage}
-                                   onChange={e => setInputMessage(e.target.value)}/>
-                            <Button size="icon" type="submit" variant="ghost">
-                                <SendIcon className="h-5 w-5"/>
-                            </Button>
-                        </form>
-
-                    </div>
-                    <DetailModal isOpen={isModalOpen} onClose={() => setModalOpen(false)} boardId={share_id}/>
-                    <Search isOpen={showModal} onClose={() => setShowModal(false)} onRoomCreated={handleNewRoomCreated}
-                            roomList={chatroom} RoomSelectChange={handleChange}/>
+                                    </button>
+                                </div>))}
+                        </div>)}
+                    </div>)}
                 </div>
-            </MobileView>
+                <div className="grid gap-4 bottom-5">
+                    {selectedChat && messages && messages.length > 0 ? (messages.map((message, index) => (<div
+                        key={`${message.message_id}_${index}`} className={`flex items-start gap-4 
+				    				${message.id === id ? 'flex-row-reverse' : 'flex-row'} ${index === messages.length - 1 ? 'mb-20' : ''}`}>
+                        <Avatar>
+                            <AvatarImage alt={message.nickname}
+                                         src={message.profile_img || "/placeholder-user.jpg"}
+                                         className={`rounded-full ${message.id === id ? 'order-1' : ''}`}
+                                         style={{
+                                             width: '50px', height: '50px', objectFit: 'cover'
+                                         }}
+                            />
+                            <AvatarFallback>{message.id ? message.id[0] : '?'}</AvatarFallback>
+                        </Avatar>
+                        <div className="max-w-[40%]">
+                            <p className={`flex items-start gap-4 ${message.id === id ? 'flex-row-reverse' : 'flex-row'}`}>
+                                <Link to={`/UserPage/${message.id}`}>
+                                    {message.nickname}
+                                </Link>
+                            </p>
+                            <div
+                                className={`rounded-lg p-4 text-sm ${message.id === id ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                                {message.content ? (<p>{message.content}</p>) : (
+                                    <button onClick={() => openModal(message)}
+                                            className="bg-white text-black border border-black hover:bg-green-500 hover:text-white px-4
+								                  													py-2 rounded transition duration-150 ease-in-out">
+                                        {message.nickname}님이 공유한 글이에요!
+                                    </button>)}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 ">{message.date}</div>
+                        </div>
+                        <div ref={messageEndRef}/>
+                    </div>))) : (<div className="flex justify-center items-center h-full">
+                        <p className="text-gray-500">채팅을 시작하세요</p>
+                    </div>)}
+                </div>
+
+                <div className="fixed bottom-0 left-0 w-full bg-gray-200 py-2 px-4 flex items-center">
+                    <form className="flex items-center w-full" onSubmit={(e) => {
+                        e.preventDefault();
+                        handleSendMessage();
+                    }}>
+                        <Input className="flex-1" placeholder="메세지를 입력하세요..." type="text" value={inputMessage}
+                               onChange={e => setInputMessage(e.target.value)}/>
+                        <Button size="icon" type="submit" variant="ghost">
+                            <SendIcon className="h-5 w-5"/>
+                        </Button>
+                    </form>
+
+                </div>
+                <DetailModal isOpen={isModalOpen} onClose={() => setModalOpen(false)} boardId={share_id}/>
+                <Search isOpen={showModal} onClose={() => setShowModal(false)} onRoomCreated={handleNewRoomCreated}
+                        roomList={chatroom} RoomSelectChange={handleChange}/>
+            </div>
+        </MobileView>
 
 
-        </div>
-    )
+    </div>)
 }
 
 export default Message;
 
 function GroupIcon(props) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="M3 7V5c0-1.1.9-2 2-2h2"/>
-            <path d="M17 3h2c1.1 0 2 .9 2 2v2"/>
-            <path d="M21 17v2c0 1.1-.9 2-2 2h-2"/>
-            <path d="M7 21H5c-1.1 0-2-.9-2-2v-2"/>
-            <rect width="7" height="5" x="7" y="7" rx="1"/>
-            <rect width="7" height="5" x="10" y="12" rx="1"/>
-        </svg>
-    )
+    return (<svg
+        {...props}
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+    >
+        <path d="M3 7V5c0-1.1.9-2 2-2h2"/>
+        <path d="M17 3h2c1.1 0 2 .9 2 2v2"/>
+        <path d="M21 17v2c0 1.1-.9 2-2 2h-2"/>
+        <path d="M7 21H5c-1.1 0-2-.9-2-2v-2"/>
+        <rect width="7" height="5" x="7" y="7" rx="1"/>
+        <rect width="7" height="5" x="10" y="12" rx="1"/>
+    </svg>)
 }
 
 
 function MessageCircleIcon(props) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/>
-        </svg>
-    )
+    return (<svg
+        {...props}
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+    >
+        <path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/>
+    </svg>)
 }
 
 
 function SendIcon(props) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="m22 2-7 20-4-9-9-4Z"/>
-            <path d="M22 2 11 13"/>
-        </svg>
-    )
+    return (<svg
+        {...props}
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+    >
+        <path d="m22 2-7 20-4-9-9-4Z"/>
+        <path d="M22 2 11 13"/>
+    </svg>)
 }
 
 function truncateString(str, num) {

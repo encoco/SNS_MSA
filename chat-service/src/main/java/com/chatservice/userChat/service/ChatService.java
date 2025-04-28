@@ -28,55 +28,24 @@ public class ChatService {
     /**
      * 내가 참여한 채팅방 목록 조회
      */
-    public List<ChatDTO> selectRoom(int userId) {
-        // 1. 참여중인 채팅방 목록 조회
-        List<ChatMemberEntity> myMemberships = chatMemberRepository.findByUserId(userId);
-        List<ChatRoomEntity> chatRooms = myMemberships.stream()
-                .map(ChatMemberEntity::getChatRoom)
-                .distinct()
+    public Map<String, Object> selectRoom(int userId) {
+        List<ChatRoomEntity> chatRooms = findUserChatRooms(userId);
+
+        if (chatRooms.isEmpty()) {
+            return emptyResult();
+        }
+
+        Map<Integer, List<ChatMemberEntity>> chatRoomMemberMap = findChatRoomMembers(chatRooms);
+
+        List<UsersInfoDTO> userInfos = findParticipantInfos(chatRoomMemberMap, userId);
+
+        List<ChatDTO> chatDTOList = chatRooms.stream()
+                .map(room -> toChatDTO(room, chatRoomMemberMap, userId))
                 .toList();
 
-        // 2. 한 번에 모든 채팅방의 참여자 조회
-        List<Integer> chatRoomIds = chatRooms.stream()
-                .map(ChatRoomEntity::getId)
-                .toList();
-
-        Map<Integer, List<ChatMemberEntity>> chatRoomMemberMap = chatMemberRepository.findByChatRoom_IdIn(chatRoomIds).stream()
-                .collect(Collectors.groupingBy(m -> m.getChatRoom().getId()));
-
-        // 3. 본인 제외한 모든 상대 유저 ID 수집
-        Set<Integer> allPartnerIds = chatRoomMemberMap.values().stream()
-                .flatMap(members -> members.stream()
-                        .map(ChatMemberEntity::getUserId)
-                        .filter(id -> id != userId))
-                .collect(Collectors.toSet());
-
-        // 4. 유저 정보 요청
-        List<Long> userIdList = allPartnerIds.stream()
-                .map(Integer::longValue)
-                .toList();
-
-        List<UsersInfoDTO> userInfos = userClient.getUserInfoList(userIdList).getBody();
-        Map<Integer, UsersInfoDTO> userInfoMap = userInfos.stream()
-                .collect(Collectors.toMap(UsersInfoDTO::getId, dto -> dto));
-
-        // 5. 채팅방 정보 + 상대방 ID로 DTO 생성
-        List<ChatDTO> result = chatRooms.stream()
-                .map(chatRoom -> {
-                    List<ChatMemberEntity> members = chatRoomMemberMap.getOrDefault(chatRoom.getId(), List.of());
-
-                    int partnerId = members.stream()
-                            .map(ChatMemberEntity::getUserId)
-                            .filter(id -> id != userId)
-                            .findFirst()
-                            .orElse(userId);
-
-                    UsersInfoDTO info = userInfoMap.get(partnerId);
-                    return ChatDTO.toDTO(chatRoom, userId,
-                            info != null ? info.getNickname() : "Unknown",
-                            info != null ? info.getProfile_img() : null);
-                })
-                .toList();
+        Map<String, Object> result = new HashMap<>();
+        result.put("chatRooms", chatDTOList);
+        result.put("userInfoList", userInfos);
 
         return result;
     }
@@ -192,6 +161,53 @@ public class ChatService {
     @Transactional
     public void leaveChatRoom(ChatDTO dto) {
         chatMemberRepository.deleteByChatRoom_IdAndUserId(dto.getUserChatId(), dto.getId());
+    }
+
+
+    private List<ChatRoomEntity> findUserChatRooms(int userId) {
+        return chatMemberRepository.findByUserId(userId).stream()
+                .map(ChatMemberEntity::getChatRoom)
+                .distinct()
+                .toList();
+    }
+
+    private Map<Integer, List<ChatMemberEntity>> findChatRoomMembers(List<ChatRoomEntity> chatRooms) {
+        List<Integer> chatRoomIds = chatRooms.stream()
+                .map(ChatRoomEntity::getId)
+                .toList();
+
+        return chatMemberRepository.findByChatRoom_IdIn(chatRoomIds).stream()
+                .collect(Collectors.groupingBy(m -> m.getChatRoom().getId()));
+    }
+
+    private List<UsersInfoDTO> findParticipantInfos(Map<Integer, List<ChatMemberEntity>> chatRoomMemberMap, int userId) {
+        Set<Integer> participantIds = chatRoomMemberMap.values().stream()
+                .flatMap(members -> members.stream()
+                        .map(ChatMemberEntity::getUserId)
+                        .filter(id -> id != userId)) // ✅ 나 제외
+                .collect(Collectors.toSet());
+
+        List<Long> userIdList = participantIds.stream()
+                .map(Integer::longValue)
+                .toList();
+
+        return userClient.getUserInfoList(userIdList).getBody();
+    }
+
+    private ChatDTO toChatDTO(ChatRoomEntity chatRoom, Map<Integer, List<ChatMemberEntity>> chatRoomMemberMap, int userId) {
+        List<Integer> memberIds = chatRoomMemberMap.getOrDefault(chatRoom.getId(), List.of()).stream()
+                .map(ChatMemberEntity::getUserId)
+                .filter(id -> id != userId) // ✅ 나 제외
+                .toList();
+
+        return ChatDTO.toDTO(chatRoom, memberIds);
+    }
+
+    private Map<String, Object> emptyResult() {
+        Map<String, Object> empty = new HashMap<>();
+        empty.put("chatRooms", Collections.emptyList());
+        empty.put("userInfoList", Collections.emptyList());
+        return empty;
     }
 }
 
