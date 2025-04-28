@@ -32,7 +32,7 @@ public class OpenChatService {
     private final OpenChatMemberRepository openChatMemberRepository;
     //private final BoardService boardService;
 
-    public void CreateCommChat(OpenChatDTO dto) {
+    public void CreateOpenChat(OpenChatDTO dto) {
         OpenChatEntity entity = OpenChatEntity.toEntity(dto);
         System.out.println("CreateCommChat Entity : " + entity);
         openChatRepository.save(entity);
@@ -54,7 +54,7 @@ public class OpenChatService {
         return dtoList;
     }
 
-    public void joinCommunity(OpenChatDTO dto) {
+    public void joinOpenRoom(OpenChatDTO dto) {
         OpenChatMemberEntity entity = OpenChatMemberEntity.toEntity(dto);
         openMemberRepository.save(entity);
     }
@@ -63,13 +63,13 @@ public class OpenChatService {
         return OpenChatMemberDTO.toDTOList(openMemberRepository.findAllById(userIdFromToken));
     }
 
-    public OpenChatMessageDTO saveCommChat(OpenChatMessageDTO message) {
+    public OpenChatMessageDTO saveOpenChat(OpenChatMessageDTO message) {
         OpenChatMessageEntity entity = OpenChatMessageEntity.toEntity(message);
         openMessageRepository.save(entity);
         return message;
     }
 
-    public List<OpenChatMessageDTO> getCommMessage(int openChatId) {
+    public List<OpenChatMessageDTO> getOpenMessage(int openChatId) {
         List<OpenChatMessageEntity> entities = openMessageRepository.findByOpenChatId(openChatId);
         List<Long> userIds =  entities.stream()
                 .map(entity -> (long) entity.getUserId())
@@ -109,7 +109,7 @@ public class OpenChatService {
 
 
     @Transactional
-    public void leaveChatRoom(OpenChatMemberDTO dto) {
+    public void leaveOpenRoom(OpenChatMemberDTO dto) {
         openMemberRepository.deleteByOpenChatIdAndId(dto.getOpenChatId(),dto.getId());
     }
 }

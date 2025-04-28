@@ -69,7 +69,7 @@ public class ChatService {
                             .map(ChatMemberEntity::getUserId)
                             .filter(id -> id != userId)
                             .findFirst()
-                            .orElse(userId);  // 상대가 없을 경우 fallback
+                            .orElse(userId);
 
                     UsersInfoDTO info = userInfoMap.get(partnerId);
                     return ChatDTO.toDTO(chatRoom, userId,

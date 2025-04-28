@@ -85,6 +85,7 @@ function Message() {
                 const response = await api.get(`/chats/rooms/my`, {
                     withCredentials: true,
                 });
+                console.log("채팅방 내역 : " , response.data);
                 setChatRoom(response.data === "채팅방 없음" ? [] : response.data);
             } catch (error) {
                 console.log(error);
