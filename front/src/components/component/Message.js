@@ -183,11 +183,16 @@ function Message() {
     const handleChat = async () => {
         setActiveView('chat');
         setSelectedChat("");
+
         try {
-            const response = await api.get(`/chats/rooms/my`, {
-                withCredentials: true,
-            });
-            setChatRoom(response.data === "채팅방 없음" ? [] : response.data);
+            const response = await api.get('/chats/rooms/my',
+                {withCredentials: true});
+            const {chatRooms, userInfoList} = response.data;
+
+            const map = new Map(userInfoList.map(user => [user.id, user]));
+
+            setChatRoom(chatRooms);
+            setUserInfoMap(map);
         } catch (error) {
             console.log(error);
         }
@@ -202,11 +207,17 @@ function Message() {
                 withCredentials: true,
             });
             console.log("OpenRoom 결과 : ", response.data);
-            setChatRoom(response.data);
+
+            const { openRooms, userInfoList } = response.data;
+            console.log("채팅방 : ",openRooms);
+            console.log("유저 인포 : " ,userInfoList);
+            setChatRoom(openRooms || []);
+            setUserInfoMap(new Map(userInfoList.map(user => [user.id, user])));
         } catch (error) {
-            setChatRoom([]); // 오류 시 빈 배열로 초기화
+            setChatRoom([]);
+            setUserInfoMap(new Map());
         }
-    }
+    };
 
     const handleChatSelect = async (room) => {
         try {

@@ -16,9 +16,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 
@@ -34,7 +32,6 @@ public class OpenChatService {
 
     public void CreateOpenChat(OpenChatDTO dto) {
         OpenChatEntity entity = OpenChatEntity.toEntity(dto);
-        System.out.println("CreateCommChat Entity : " + entity);
         openChatRepository.save(entity);
     }
 
@@ -44,10 +41,9 @@ public class OpenChatService {
 
         for (OpenChatEntity entity : entityList) {
             OpenChatDTO dto = OpenChatDTO.toDTO(entity);
-
             int count = openChatMemberRepository.countByOpenChatId(entity.getOpenChatId());
-            dto.setParticipantCount(count);
 
+            dto.setParticipantCount(count);
             dtoList.add(dto);
         }
 
@@ -59,8 +55,20 @@ public class OpenChatService {
         openMemberRepository.save(entity);
     }
 
-    public List<OpenChatMemberDTO> selectOpenChat(int userIdFromToken) {
-        return OpenChatMemberDTO.toDTOList(openMemberRepository.findAllById(userIdFromToken));
+    public Map<String, Object> selectMyOpenRoomsGrouped(int userId) {
+        Set<Integer> openChatIds = getJoinedOpenChatIds(userId);
+        if (openChatIds.isEmpty()) {
+            return createEmptyResult();
+        }
+
+        Map<Integer, List<Integer>> memberMap = getMemberMap(openChatIds);
+        List<UsersInfoDTO> userInfoList = getUserInfoList(memberMap);
+        List<OpenChatDTO> openRooms = getOpenChatDTOs(openChatIds, memberMap);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("openRooms", openRooms);
+        result.put("userInfoList", userInfoList);
+        return result;
     }
 
     public OpenChatMessageDTO saveOpenChat(OpenChatMessageDTO message) {
@@ -77,13 +85,11 @@ public class OpenChatService {
                 .collect(Collectors.toList());
 
         List<UsersInfoDTO> userInfoList = userClient.getUserInfoList(userIds).getBody();
-        System.out.println("userInfoList : " + userInfoList);
         Map<Long, UsersInfoDTO> userInfoMap = userInfoList.stream()
                 .collect(Collectors.toMap(
                         dto -> (long) dto.getId(),
                         dto -> dto
                 ));
-        System.out.println("userInfoMap : " + userInfoMap);
 
         List<OpenChatMessageDTO> dtos = new ArrayList<>();
         for (OpenChatMessageEntity entity : entities) {
@@ -95,7 +101,6 @@ public class OpenChatService {
             dto.setDate(entity.getDate());
 
             UsersInfoDTO userInfo = userInfoMap.get((long) entity.getUserId());
-            System.out.println("userInfo?? : " + userInfo);
             if (userInfo != null) {
                 dto.setNickname(userInfo.getNickname());
                 dto.setProfile_img(userInfo.getProfile_img());
@@ -103,13 +108,56 @@ public class OpenChatService {
 
             dtos.add(dto);
         }
-        System.out.println("최종 dots : " + dtos);
         return dtos;
     }
-
 
     @Transactional
     public void leaveOpenRoom(OpenChatMemberDTO dto) {
         openMemberRepository.deleteByOpenChatIdAndId(dto.getOpenChatId(),dto.getId());
+    }
+
+
+    private Set<Integer> getJoinedOpenChatIds(int userId) {
+        List<OpenChatMemberEntity> myMemberships = openMemberRepository.findAllById(userId);
+        return myMemberships.stream()
+                .map(m -> m.getOpenChat().getOpenChatId())
+                .collect(Collectors.toSet());
+    }
+
+    private Map<Integer, List<Integer>> getMemberMap(Set<Integer> openChatIds) {
+        List<OpenChatMemberEntity> allMembers = openMemberRepository.findByOpenChat_OpenChatIdIn(openChatIds);
+        return allMembers.stream()
+                .collect(Collectors.groupingBy(
+                        m -> m.getOpenChat().getOpenChatId(),
+                        Collectors.mapping(OpenChatMemberEntity::getId, Collectors.toList())
+                ));
+    }
+
+    private List<UsersInfoDTO> getUserInfoList(Map<Integer, List<Integer>> memberMap) {
+        Set<Integer> allIds = memberMap.values().stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toSet());
+        List<Long> userIdList = allIds.stream()
+                .map(Integer::longValue)
+                .toList();
+        return userClient.getUserInfoList(userIdList).getBody();
+    }
+
+    private List<OpenChatDTO> getOpenChatDTOs(Set<Integer> openChatIds, Map<Integer, List<Integer>> memberMap) {
+        List<OpenChatEntity> openChatEntities = openChatRepository.findByOpenChatIdIn(openChatIds);
+        return openChatEntities.stream()
+                .map(entity -> {
+                    OpenChatDTO dto = OpenChatDTO.toDTO(entity);
+                    dto.setMemberIds(memberMap.getOrDefault(entity.getOpenChatId(), List.of()));
+                    return dto;
+                })
+                .toList();
+    }
+
+    private Map<String, Object> createEmptyResult() {
+        Map<String, Object> emptyResult = new HashMap<>();
+        emptyResult.put("openRooms", Collections.emptyList());
+        emptyResult.put("userInfoList", Collections.emptyList());
+        return emptyResult;
     }
 }

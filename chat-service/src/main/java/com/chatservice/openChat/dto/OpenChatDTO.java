@@ -39,6 +39,8 @@ public class OpenChatDTO {
     @Schema(description = "참여자 수", example = "5")
     private int participantCount;
 
+    private List<Integer> memberIds;
+
     @Builder.Default
     private String date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"));
 

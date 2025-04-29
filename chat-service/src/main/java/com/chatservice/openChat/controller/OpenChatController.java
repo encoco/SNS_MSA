@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -44,7 +45,6 @@ public class OpenChatController implements OpenDocs {
     @GetMapping("/open")
     public ResponseEntity<?> openRoom() {
         List<OpenChatDTO> dto = openChatService.selectAllOpenRoom();
-
         try {
             if (dto != null) {
                 return ResponseEntity.ok(dto);
@@ -57,8 +57,8 @@ public class OpenChatController implements OpenDocs {
 
     @GetMapping("/open/my")
     public ResponseEntity<?> selectOpenMyRoom() {
-        List<OpenChatMemberDTO> dto = openChatService.selectOpenChat(AuthInfoUtil.getUserId());
-        System.out.println(dto);
+        Map<String, Object> dto = openChatService.selectMyOpenRoomsGrouped(AuthInfoUtil.getUserId());
+        System.out.println("내 오픈 채팅방 : " + dto);
         try {
             if (dto != null) {
                 return ResponseEntity.ok(dto);

@@ -44,8 +44,6 @@ Spring Cloud 기반 기술 스택을 활용해 유연하고 확장 가능한 구
 1. 사용자가 게시글 작성
 2. `board-service`가 게시글 저장 후 Kafka로 `PostCreatedEvent` 전송
 3. `alarm-service`가 이벤트 수신 후 알림 저장
-4. 사용자는 알림 API 또는 WebSocket으로 알림 확인
-
 ### 팔로우 → 알림
 
 1. 사용자가 팔로우 요청 (`user-service`)
@@ -56,14 +54,15 @@ Spring Cloud 기반 기술 스택을 활용해 유연하고 확장 가능한 구
 ## 포트상태
 
 
-| 서비스명       | 포트 |
-|----------------|------|
-| gateway        | 8000 |
-| user-service   | 8081 |
-| chat-service   | 8082 |
-| board-service  | 8083 |
-| alarm-service  | 8084 |
-| discovery      | 8761 |
+| 서비스명          | 포트   |
+|---------------|------|
+| gateway       | 8000 |
+| user-service  | 8081 |
+| chat-service  | 8082 |
+| board-service | 8083 |
+| alarm-service | 8084 |
+| discovery     | 8761 |
+| prometheus    | 9090 |
 
 ---
 
@@ -89,6 +88,4 @@ Spring Cloud 기반 기술 스택을 활용해 유연하고 확장 가능한 구
 - [ ] Prometheus + Grafana 기반 모니터링 도입 (`feature/monitoring-setup`)
 - [ ] 서비스별 테스트 코드 작성 및 GitHub Actions 자동 테스트
 - [ ] Elastic Stack 기반 로그 수집/분석 구조 적용
-- [ ] 슬랙/이메일 기반 실시간 알림 Webhook 연동
-
 ---
