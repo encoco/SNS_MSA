@@ -8,25 +8,23 @@ function Together({onJoinRoom}) {
     const [addCommu, setAddCommu] = useState(false);
     const [commuRoom, setCommuRoom] = useState(null);
     const [joinedRoomIds, setJoinedRoomIds] = useState(new Set());
-    const [participantsCount, setParticipantsCount] = useState({});
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [allRooms, myRooms] = await Promise.all([
-                    api.get(`/chats/open`, { withCredentials: true }),
-                    api.get(`/chats/open/my`, { withCredentials: true })
-                ]);
-
-                setCommuRoom(allRooms.data === "채팅방 없음" ? [] : allRooms.data);
-                const ids = new Set(myRooms.data.map(room => room.openChatId));
-                setJoinedRoomIds(ids);
-            } catch (error) {
-                console.error("방 목록 불러오기 실패", error);
-            }
-        };
-        fetchData();
-    }, []);
+    // useEffect(() => {
+    //     const fetchData = async () => {
+    //         try {
+    //             const [allRooms, myRooms] = await Promise.all([
+    //                 api.get(`/chats/open`, { withCredentials: true }),
+    //                 api.get(`/chats/open/my`, { withCredentials: true })
+    //             ]);
+    //             setCommuRoom(allRooms.data === "채팅방 없음" ? [] : allRooms.data);
+    //             const ids = new Set(myRooms.data.map(room => room.openChatId));
+    //             setJoinedRoomIds(ids);
+    //         } catch (error) {
+    //             console.error("방 목록 불러오기 실패", error);
+    //         }
+    //     };
+    //     fetchData();
+    // }, []);
 
     const handleJoin = async (room) => {
         if (joinedRoomIds.has(room.openChatId)) {

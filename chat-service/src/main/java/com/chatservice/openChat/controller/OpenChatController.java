@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -36,7 +37,7 @@ public class OpenChatController implements OpenDocs {
         message.setOpenChatId(chat_id);
         message.setId(userId);
 
-        OpenChatMessageDTO savedMessage = openChatService.saveCommChat(message);
+        OpenChatMessageDTO savedMessage = openChatService.saveOpenChat(message);
         messagingTemplate.convertAndSend("/api/chats/sub/open/" + chat_id, savedMessage);
 
     }
@@ -44,7 +45,6 @@ public class OpenChatController implements OpenDocs {
     @GetMapping("/open")
     public ResponseEntity<?> openRoom() {
         List<OpenChatDTO> dto = openChatService.selectAllOpenRoom();
-
         try {
             if (dto != null) {
                 return ResponseEntity.ok(dto);
@@ -57,8 +57,8 @@ public class OpenChatController implements OpenDocs {
 
     @GetMapping("/open/my")
     public ResponseEntity<?> selectOpenMyRoom() {
-        List<OpenChatMemberDTO> dto = openChatService.selectOpenChat(AuthInfoUtil.getUserId());
-        System.out.println(dto);
+        Map<String, Object> dto = openChatService.selectMyOpenRoomsGrouped(AuthInfoUtil.getUserId());
+        System.out.println("내 오픈 채팅방 : " + dto);
         try {
             if (dto != null) {
                 return ResponseEntity.ok(dto);
@@ -73,7 +73,7 @@ public class OpenChatController implements OpenDocs {
     public ResponseEntity<?> createOpenChat(@ModelAttribute OpenChatDTO dto) {
         try {
             dto.setId(AuthInfoUtil.getUserId());
-            openChatService.CreateCommChat(dto);
+            openChatService.CreateOpenChat(dto);
             return ResponseEntity.ok("");
 
         } catch (Exception e) {
@@ -85,14 +85,14 @@ public class OpenChatController implements OpenDocs {
 
     @GetMapping("/open/{openChatId}/messages")
     public ResponseEntity<List<OpenChatMessageDTO>> getMessages(@PathVariable int openChatId) {
-        List<OpenChatMessageDTO> dto = openChatService.getCommMessage(openChatId);
+        List<OpenChatMessageDTO> dto = openChatService.getOpenMessage(openChatId);
         return ResponseEntity.ok(dto);
     }
 
     @PostMapping("/open/join")
     public ResponseEntity<?> joinOpenRoom(@RequestBody OpenChatDTO dto) {
         dto.setId(AuthInfoUtil.getUserId());
-        openChatService.joinCommunity(dto);
+        openChatService.joinOpenRoom(dto);
         return ResponseEntity.ok(null);
     }
 
@@ -100,7 +100,7 @@ public class OpenChatController implements OpenDocs {
     @PostMapping("/open/{openChatId}/leave")
         public ResponseEntity<Void> leaveOpenChat(@RequestBody OpenChatMemberDTO dto) {
         dto.setId(AuthInfoUtil.getUserId());
-        openChatService.leaveChatRoom(dto);
+        openChatService.leaveOpenRoom(dto);
         return ResponseEntity.ok(null);
     }
 }

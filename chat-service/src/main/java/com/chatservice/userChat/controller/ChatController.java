@@ -48,11 +48,13 @@ public class ChatController implements ChatDocs {
     public ResponseEntity<?> getMyChatRooms() {
         int userId = AuthInfoUtil.getUserId();
         long start = System.currentTimeMillis();
-        List<ChatDTO> dto = chatService.selectRoom(userId);
+
+        Map<String, Object> dto = chatService.selectRoom(userId);
+        System.out.println("채팅방 목록 : " + dto);
 
         long end = System.currentTimeMillis();
-        //System.out.println("최적화 이전 수행 시간(ms): " + (end - start));
-        System.out.println("최적화 방식 수행 시간(ms): " + (end - start));
+        System.out.println("N+1 최적화 방식 수행 시간(ms): " + (end - start));
+
         try {
             if (dto != null) {
                 return ResponseEntity.ok(dto);

@@ -7,6 +7,7 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 
 @Data
@@ -30,6 +31,13 @@ public class ChatDTO {
     @Schema(description = "새로 만든 채팅방인지 생성할 때 확인용" , example = "T/F")
     private boolean new_room;
 
+    @Schema(description = "채팅방 참여자 ID 리스트" , example = "{1,2,3}")
+    private List<Integer> memberIds;
+
+    @Setter
+    @Schema(description = "가장 최신에 저장된 메세지 시간" , example = "T/F")
+    private String LastMessageDate;
+
     @Builder.Default
     private String date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"));
 
@@ -43,4 +51,11 @@ public class ChatDTO {
                 .build();
     }
 
+    public static ChatDTO toDTO(ChatRoomEntity entity, List<Integer> memberIds) {
+        return ChatDTO.builder()
+                .userChatId(entity.getId())
+                .memberIds(memberIds)
+                .date(entity.getDate())
+                .build();
+    }
 }
