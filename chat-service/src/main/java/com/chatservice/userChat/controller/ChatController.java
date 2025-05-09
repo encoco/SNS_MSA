@@ -50,9 +50,11 @@ public class ChatController implements ChatDocs {
         long start = System.currentTimeMillis();
 
         Map<String, Object> dto = chatService.selectRoom(userId);
+        System.out.println("채팅방 목록 : " + dto);
 
         long end = System.currentTimeMillis();
-        System.out.println("최적화 방식 수행 시간(ms): " + (end - start));
+        System.out.println("N+1 최적화 방식 수행 시간(ms): " + (end - start));
+
         try {
             if (dto != null) {
                 return ResponseEntity.ok(dto);

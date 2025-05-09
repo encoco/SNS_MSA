@@ -15,6 +15,8 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -30,23 +32,41 @@ public class ChatService {
      */
     public Map<String, Object> selectRoom(int userId) {
         List<ChatRoomEntity> chatRooms = findUserChatRooms(userId);
-
-        if (chatRooms.isEmpty()) {
-            return emptyResult();
-        }
+        if (chatRooms.isEmpty()) return emptyResult();
 
         Map<Integer, List<ChatMemberEntity>> chatRoomMemberMap = findChatRoomMembers(chatRooms);
-
         List<UsersInfoDTO> userInfos = findParticipantInfos(chatRoomMemberMap, userId);
 
+        List<Integer> roomIds = chatRooms.stream()
+                .map(ChatRoomEntity::getId)
+                .toList();
+
+        List<ChatMessageRepository.ChatIdAndLastDate> raws =
+                messageRepository.findLatestDates(roomIds);
+        Map<Integer, String> lastDateMap = raws.stream()
+                .collect(Collectors.toMap(
+                        ChatMessageRepository.ChatIdAndLastDate::getChatId,
+                        ChatMessageRepository.ChatIdAndLastDate::getLastDate
+                ));
+
         List<ChatDTO> chatDTOList = chatRooms.stream()
-                .map(room -> toChatDTO(room, chatRoomMemberMap, userId))
+                .map(room -> {
+                    ChatDTO dto = toChatDTO(room, chatRoomMemberMap, userId);
+                    String lastDate = lastDateMap.get(room.getId());
+                    dto.setLastMessageDate(
+                            lastDate != null ? lastDate : dto.getDate()
+                    );
+                    return dto;
+                })
+                .sorted(Comparator.comparing(
+                        ChatDTO::getLastMessageDate,
+                        Comparator.nullsLast(Comparator.reverseOrder())
+                ))
                 .toList();
 
         Map<String, Object> result = new HashMap<>();
         result.put("chatRooms", chatDTOList);
         result.put("userInfoList", userInfos);
-
         return result;
     }
 

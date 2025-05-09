@@ -43,7 +43,7 @@ public class ChatMessageDTO {
     private Integer share_board_id;
 
     @Builder.Default
-    private String date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"));
+    private String date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"));
 
     public static ChatMessageDTO toDTO(ChatMessageEntity entity, String nickname, String profileImg) {
         return ChatMessageDTO.builder()
