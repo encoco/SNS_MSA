@@ -1,6 +1,5 @@
 import React, {useEffect, useState} from 'react';
 import api from "../../../api";
-import webSocketService from '../../../services/WebSocketService';
 
 function Share({isOpen, onClose, post}) {
     const [searchTerm, setSearchTerm] = useState('');
@@ -65,7 +64,7 @@ function Share({isOpen, onClose, post}) {
                 alert('유저를 선택해주세요');
                 return;
             }
-            const response = await api.post(`/chats/SharePost`, requestData, {
+            await api.post(`/chats/SharePost`, requestData, {
                 withCredentials: true
             });
             alert('공유 완료');

@@ -1,15 +1,12 @@
 import React, {useState} from 'react';
-import {useNavigate} from "react-router-dom";
 import api from "../../../api";
 import BoardWrite from '../BoardWrite';
 
 function DropdownMenu({post}) {
     const [isOpen, setIsOpen] = useState(false);
-    const navigate = useNavigate();
     const userNickname = JSON.parse(localStorage.getItem("nickname")).nickname;
     const toggleDropdown = () => setIsOpen(!isOpen);
     const [showModal, setShowModal] = useState(false);
-
     const [isEditModalOpen, setIsEditModalOpen] = useState(false); // 수정 모달 상태 추가
 
     const editPost = (post) => {

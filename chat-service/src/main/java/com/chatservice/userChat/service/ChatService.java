@@ -30,43 +30,50 @@ public class ChatService {
     /**
      * 내가 참여한 채팅방 목록 조회
      */
-    public Map<String, Object> selectRoom(int userId) {
-        List<ChatRoomEntity> chatRooms = findUserChatRooms(userId);
-        if (chatRooms.isEmpty()) return emptyResult();
+    public Map<String, Object> selectRoom(int userId, String before) {
+        List<Integer> pageRoomIds = chatRepository.findPagedRoomIds(userId, before, 30);
+        if (pageRoomIds.isEmpty()) {
+            return emptyResult();
+        }
 
-        Map<Integer, List<ChatMemberEntity>> chatRoomMemberMap = findChatRoomMembers(chatRooms);
-        List<UsersInfoDTO> userInfos = findParticipantInfos(chatRoomMemberMap, userId);
-
-        List<Integer> roomIds = chatRooms.stream()
-                .map(ChatRoomEntity::getId)
-                .toList();
+        List<ChatRoomEntity> chatRooms = chatRepository.findAllById(pageRoomIds);
+        Map<Integer, List<ChatMemberEntity>> memberMap = findChatRoomMembers(chatRooms);
+        List<UsersInfoDTO> userInfos = findParticipantInfos(memberMap, userId);
 
         List<ChatMessageRepository.ChatIdAndLastDate> raws =
-                messageRepository.findLatestDates(roomIds);
+                messageRepository.findLatestDates(pageRoomIds);
         Map<Integer, String> lastDateMap = raws.stream()
                 .collect(Collectors.toMap(
                         ChatMessageRepository.ChatIdAndLastDate::getChatId,
                         ChatMessageRepository.ChatIdAndLastDate::getLastDate
                 ));
 
-        List<ChatDTO> chatDTOList = chatRooms.stream()
-                .map(room -> {
-                    ChatDTO dto = toChatDTO(room, chatRoomMemberMap, userId);
-                    String lastDate = lastDateMap.get(room.getId());
+        String nextCursor = null;
+        if (pageRoomIds.size() == 30) {
+            nextCursor = lastDateMap.get(
+                    pageRoomIds.get(pageRoomIds.size() - 1)
+            );
+        }
+
+        List<ChatDTO> chatDTOList = pageRoomIds.stream()
+                .map(roomId -> {
+                    ChatRoomEntity room = chatRooms.stream()
+                            .filter(r -> r.getId() == roomId)
+                            .findFirst()
+                            .orElseThrow();
+                    ChatDTO dto = toChatDTO(room, memberMap, userId);
+                    String lastDate = lastDateMap.get(roomId);
                     dto.setLastMessageDate(
-                            lastDate != null ? lastDate : dto.getDate()
+                            lastDate != null ? lastDate : room.getDate()
                     );
                     return dto;
                 })
-                .sorted(Comparator.comparing(
-                        ChatDTO::getLastMessageDate,
-                        Comparator.nullsLast(Comparator.reverseOrder())
-                ))
                 .toList();
 
         Map<String, Object> result = new HashMap<>();
         result.put("chatRooms", chatDTOList);
         result.put("userInfoList", userInfos);
+        result.put("nextCursor", nextCursor);
         return result;
     }
 

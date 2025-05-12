@@ -45,12 +45,12 @@ public class ChatController implements ChatDocs {
     }
 
     @GetMapping("/rooms/my")
-    public ResponseEntity<?> getMyChatRooms() {
+    public ResponseEntity<?> getMyChatRooms(@RequestParam(required = false) String before) {
         int userId = AuthInfoUtil.getUserId();
         long start = System.currentTimeMillis();
 
-        Map<String, Object> dto = chatService.selectRoom(userId);
-        System.out.println("채팅방 목록 : " + dto);
+        Map<String, Object> dto = chatService.selectRoom(userId, before);
+        System.out.println("채팅방 목록 : " + dto.size());
 
         long end = System.currentTimeMillis();
         System.out.println("N+1 최적화 방식 수행 시간(ms): " + (end - start));

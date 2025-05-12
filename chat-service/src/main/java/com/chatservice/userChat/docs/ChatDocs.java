@@ -38,7 +38,7 @@ public interface ChatDocs {
             @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content)
     })
     @GetMapping("/rooms/my")
-    ResponseEntity<?> getMyChatRooms();
+    ResponseEntity<?> getMyChatRooms(@RequestParam(required = false) String before);
 
     @Operation(summary = "채팅방 생성 또는 기존 방 반환", description = "사용자 목록을 기준으로 새 채팅방을 생성하거나 기존 방을 반환합니다.")
     @ApiResponses(value = {

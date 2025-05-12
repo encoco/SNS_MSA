@@ -22,7 +22,7 @@ function Message() {
     const [showModal, setShowModal] = useState(false);
     const [share_id, setShare_id] = useState('');
     const [isModalOpen, setModalOpen] = useState(false);
-    const [nickname, setNickname] = useState(''); // 초기 상태를 빈 문자열로 설정
+    const [nickname, setNickname] = useState('');
     const [id, setId] = useState('')
     const messageEndRef = useRef(null);
     const [isListExpanded, setIsListExpanded] = useState(false);
@@ -33,6 +33,10 @@ function Message() {
     const [userInfoMap, setUserInfoMap] = useState(new Map());
     const [showParticipants, setShowParticipants] = useState(false);
     const [selectedRoomForParticipants, setSelectedRoomForParticipants] = useState(null);
+    const [loadingRooms, setLoading]   = useState(false);
+    const [hasMore,      setHasMore]   = useState(true);
+    const [cursor,       setCursor]    = useState(null);
+    const chatListRef = useRef(null);
 
     const handleContextMenu = (event, room) => {
         event.preventDefault();
@@ -43,8 +47,8 @@ function Message() {
         });
     };
 
-    // 컨텍스트 메뉴 닫기 함수
     const closeContextMenu = () => setContextMenu(null);
+
 
     const scrollToBottom = () => {
         if (messageEndRef.current) {
@@ -85,24 +89,6 @@ function Message() {
         setShowParticipants(true);
     };
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const response = await api.get('/chats/rooms/my',
-                                                            {withCredentials: true});
-                const {chatRooms, userInfoList} = response.data;
-
-                const map = new Map(userInfoList.map(user => [user.id, user]));
-
-                setChatRoom(chatRooms);
-                setUserInfoMap(map);
-            } catch (error) {
-                console.error('채팅방 불러오기 실패', error);
-            }
-        };
-
-        fetchData();
-    }, []);
 
     useEffect(() => {
         if (!webSocketService.client.connected || !selectedChat) return;
@@ -116,22 +102,6 @@ function Message() {
             subscription?.unsubscribe();
         };
     }, [selectedChat, activeView]);
-
-    useEffect(() => {
-        const handleScroll = () => {
-            // Show button if not at the top of the document (you can adjust the threshold)
-            const shouldShow = window.scrollY > 100;
-            setShowTopBtn(shouldShow);
-        };
-
-        // Add scroll listener
-        window.addEventListener('scroll', handleScroll);
-
-        // Clean up function to remove the event listener
-        return () => {
-            window.removeEventListener('scroll', handleScroll);
-        };
-    }, []);
 
     // 맨 위로 스크롤하는 함수
     const scrollToTop = () => {
@@ -181,23 +151,47 @@ function Message() {
     };
 
     const handleChat = async () => {
-        setActiveView('chat');
-        setSelectedChat("");
-
+        if (loadingRooms || !hasMore) return;
+        setLoading(true);
         try {
-            const response = await api.get('/chats/rooms/my',
-                {withCredentials: true});
-            const {chatRooms, userInfoList} = response.data;
-
-            const map = new Map(userInfoList.map(user => [user.id, user]));
-
-            setChatRoom(chatRooms);
-            setUserInfoMap(map);
-        } catch (error) {
-            console.log(error);
+            const res = await api.get('/chats/rooms/my', {
+                params: { before: cursor },
+                withCredentials: true
+            });
+            const { chatRooms, userInfoList, nextCursor } = res.data;
+            setChatRoom(prev => [...prev, ...chatRooms]);
+            setUserInfoMap(prev => {
+                const m = new Map(prev);
+                userInfoList.forEach(u => m.set(u.id, u));
+                return m;
+            });
+            setCursor(nextCursor);
+            setHasMore(chatRooms.length === 30);
+            console.log("채팅방 개수 : " , chatRooms);
+        } catch (err) {
+            console.error('채팅방 로드 실패', err);
+        } finally {
+            setLoading(false);
         }
+    };
 
-    }
+    useEffect(() => {
+        handleChat();  // 초기 한 번만 호출
+
+        const el = chatListRef.current;
+        if (!el) return;
+
+        const onScroll = () => {
+            if (el.scrollTop + el.clientHeight >= el.scrollHeight - 100) {
+                if (!loadingRooms && hasMore) {
+                    handleChat();
+                }
+            }
+        };
+
+        el.addEventListener('scroll', onScroll);
+        return () => el.removeEventListener('scroll', onScroll);
+    }, []);
 
     const handleGroup = async () => {
         setActiveView('group');
@@ -206,11 +200,8 @@ function Message() {
             const response = await api.get(`/chats/open/my`, {
                 withCredentials: true,
             });
-            console.log("OpenRoom 결과 : ", response.data);
-
             const { openRooms, userInfoList } = response.data;
-            console.log("채팅방 : ",openRooms);
-            console.log("유저 인포 : " ,userInfoList);
+
             setChatRoom(openRooms || []);
             setUserInfoMap(new Map(userInfoList.map(user => [user.id, user])));
         } catch (error) {
@@ -447,9 +438,9 @@ function Message() {
                                     </div>))}
 
 
-                            <div className="w-[300px] border-l bg-gray-100/40 p-6 dark:bg-gray-800/40">
+                            <div className="w-[300px] border-l bg-gray-100/40 p-6 dark:bg-gray-800/40" >
                                 <div
-                                    className="flex-1 overflow-y-auto py-2 max-h-[calc(100vh-135px)] p-6"> {/*//여기*/}
+                                    className="flex-1 overflow-y-auto py-2 max-h-[calc(100vh-135px)] p-6"  ref={chatListRef}>
                                     <nav className="grid items-start px-4 text-sm font-medium">
                                         <Link
                                             className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${activeView === 'chat' ? 'bg-gray-200 text-gray-900 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-50 dark:hover:text-gray-50' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50'}`}
@@ -478,62 +469,63 @@ function Message() {
                                         </div>
                                         <hr className="mt-4 mb-2 border-gray-300 dark:border-gray-700"/>
 
-                                        {chatroom && chatroom.length > 0 ? (
-                                            chatroom.map((room, index) => {
-                                                const isSelected = selectedChat === (activeView === 'group' ? room.openChatId : room.userChatId);
+                                            {chatroom && chatroom.length > 0 ? (
+                                                chatroom.map((room, index) => {
+                                                    const isSelected = selectedChat === (activeView === 'group' ? room.openChatId : room.userChatId);
 
-                                                return (
-                                                    <div
-                                                        key={`${activeView === 'group' ? room.openChatId : room.userChatId}_${index}`}
-                                                        onContextMenu={(e) => handleContextMenu(e, room)}
-                                                        className="flex justify-between items-center h-full m-2"
-                                                    >
-                                                        <button
-                                                            onClick={() => {
-                                                                if (activeView === 'group') {
-                                                                    handleCommChat(room);
-                                                                } else {
-                                                                    handleChatSelect(room);
-                                                                }
-                                                            }}
-                                                            className={`flex flex-col items-start space-y-1 p-2 rounded-lg transition-colors w-full text-left 
+                                                    return (
+                                                        <div
+                                                            key={`${activeView === 'group' ? room.openChatId : room.userChatId}_${index}`}
+                                                            onContextMenu={(e) => handleContextMenu(e, room)}
+                                                            className="flex justify-between items-center h-full m-2"
+                                                            ref={chatListRef}
+                                                        >
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (activeView === 'group') {
+                                                                        handleCommChat(room);
+                                                                    } else {
+                                                                        handleChatSelect(room);
+                                                                    }
+                                                                }}
+                                                                className={`flex flex-col items-start space-y-1 p-2 rounded-lg transition-colors w-full text-left 
                                 shadow-md hover:shadow-md
                                 ${isSelected ? 'bg-gray-200' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-                                                        >
-                                                            <div className="flex items-center space-x-3">
+                                                            >
+                                                                <div className="flex items-center space-x-3">
                         <span className="text-sm font-medium text-gray-800 dark:text-white">
                             {truncateString(activeView === 'group' ? room.title : room.roomname, 10)}
                         </span>
-                                                            </div>
+                                                                </div>
 
-                                                            {/* 닉네임 미리보기 3명까지 */}
-                                                            <div className="flex flex-wrap gap-1 ml-14 mt-1 ">
-                                                                {room.memberIds?.slice(0, 3).map(userId => {
-                                                                    const user = userInfoMap.get(userId);
-                                                                    return (
-                                                                        <span
-                                                                            key={userId}
-                                                                            className="text-xs text-gray-500 bg-gray-200 rounded-full px-2 py-0.5"
-                                                                        >
+                                                                {/* 닉네임 미리보기 3명까지 */}
+                                                                <div className="flex flex-wrap gap-1 ml-14 mt-1 ">
+                                                                    {room.memberIds?.slice(0, 3).map(userId => {
+                                                                        const user = userInfoMap.get(userId);
+                                                                        return (
+                                                                            <span
+                                                                                key={userId}
+                                                                                className="text-xs text-gray-500 bg-gray-200 rounded-full px-2 py-0.5"
+                                                                            >
                                                                             {user?.nickname || "Unknown"}
                                                                         </span>
-                                                                    );
-                                                                })}
-                                                                {room.memberIds?.length > 3 && (
-                                                                    <span className="text-xs text-gray-400 ml-1">
+                                                                        );
+                                                                    })}
+                                                                    {room.memberIds?.length > 3 && (
+                                                                        <span className="text-xs text-gray-400 ml-1">
                                                                         +{room.memberIds.length - 3}
                                                                     </span>
-                                                                )}
-                                                            </div>
-                                                        </button>
-                                                    </div>
-                                                );
-                                            })
-                                        ) : (
-                                            <div className="flex justify-center items-center h-full">
-                                                <p className="text-gray-500">채팅방이 없습니다</p>
-                                            </div>
-                                        )}
+                                                                    )}
+                                                                </div>
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })
+                                            ) : (
+                                                <div className="flex justify-center items-center h-full">
+                                                    <p className="text-gray-500">채팅방이 없습니다</p>
+                                                </div>
+                                            )}
                                     </nav>
                                 </div>
                             </div>

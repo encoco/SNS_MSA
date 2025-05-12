@@ -60,7 +60,7 @@ function Alarm({isOpen, onClose}) {
                                 <div className="flex justify-between items-center">
                                     <Link to={`/UserPage/${alarm.sender_id}`}
                                           className="font-semibold"><strong>{alarm.nickname}</strong></Link>
-                                    {alarm.board_id != 0 && (
+                                    {alarm.board_id !== 0 && (
                                         <button
                                             onClick={() => openModal(alarm.board_id)}
                                             className="bg-black text-white px-4 py-2 rounded hover:bg-green-600 transition duration-150 ease-in-out"

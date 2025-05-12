@@ -1,4 +1,4 @@
-import React,{useEffect} from 'react';
+import React from 'react';
 import {Navigate, Route, Routes} from 'react-router-dom';
 import LoginPage from './components/component/LoginPage';
 import SignupPage from './components/component/Signup';
@@ -8,7 +8,6 @@ import Message from './components/component/Message';
 import Setting from './components/component/Setting';
 import Together from './components/component/Together';
 import UserPage from './components/component/UserPage';
-import { webSocketService } from './services/WebSocketService';
 
 // 로그인 상태에 따라 접근 권한을 조절하는 컴포넌트
 const PrivateRoute = ({children}) => {
