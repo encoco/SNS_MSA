@@ -85,7 +85,7 @@ Spring Cloud 기반 기술 스택을 활용해 유연하고 확장 가능한 구
 ---
 ## 향후 확장 계획
 
-- [ ] Prometheus + Grafana 기반 모니터링 도입 (`feature/monitoring-setup`)
+- [x] Prometheus + Grafana 기반 모니터링 도입 (`feature/monitoring-setup`)
 - [ ] 서비스별 테스트 코드 작성 및 GitHub Actions 자동 테스트
 - [ ] Elastic Stack 기반 로그 수집/분석 구조 적용
 ---
